@@ -1,0 +1,12 @@
+FROM golang:1.27-alpine AS builder
+
+WORKDIR /src
+COPY go.mod ./
+COPY comum ./comum
+COPY simulador ./simulador
+RUN CGO_ENABLED=0 go build -o /out/simulador ./simulador
+
+FROM alpine:3.22
+WORKDIR /app
+COPY --from=builder /out/simulador /usr/local/bin/simulador
+ENTRYPOINT ["simulador"]

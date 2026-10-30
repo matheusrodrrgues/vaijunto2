@@ -126,7 +126,11 @@ sequenceDiagram
     C->>T: commit(tx)
 ~~~
 
-Se qualquer preparação ou confirmação falhar, o coordenador envia `abort` aos participantes já contatados. Preparações abandonadas possuem prazo contado pelo relógio local de cada participante e liberam os assentos automaticamente. As operações são idempotentes pela `transacao_id` e pelo cabeçalho `Idempotency-Key`.
+Depois que todos preparam, o coordenador grava duravelmente a decisão antes de enviar o primeiro `commit`. Se cair nesse intervalo ou entre duas confirmações, a decisão e a lista de participantes são recuperadas do `estado.json`. O servidor consulta os estados e repete as operações idempotentes até concluir.
+
+Se uma preparação for recusada antes da decisão, o coordenador envia `abort` aos participantes já contatados. Preparações abandonadas possuem prazo contado pelo relógio local de cada participante e liberam os assentos automaticamente. Se uma preparação expirar enquanto o coordenador estiver fora, a recuperação muda duravelmente para aborto e compensa os participantes que já haviam confirmado.
+
+As operações são idempotentes pela `transacao_id` e pelo cabeçalho `Idempotency-Key`. Uma resposta perdida não implica repetição do desconto: o coordenador consulta o estado do participante e continua a partir do resultado armazenado.
 
 ### `POST /api/v1/reservations/prepare`
 
@@ -165,6 +169,24 @@ Libera os assentos da transação. Também é idempotente e pode compensar uma c
 
 Consulta o estado local da transação: `preparada`, `confirmada` ou `abortada`.
 
+### `GET /api/v1/diagnostics/transactions`
+
+Fornece somente contagens agregadas para a auditoria do simulador, sem expor passageiros, tokens ou trechos:
+
+~~~json
+{
+  "empresa_id": "empresa-a",
+  "preparadas": 0,
+  "confirmadas": 4,
+  "abortadas": 19,
+  "coordenacoes_pendentes": 0,
+  "coordenacoes_concluidas": 2,
+  "coordenacoes_abortadas": 1
+}
+~~~
+
+Ao final da carga, `preparadas` e `coordenacoes_pendentes` devem ser iguais a zero.
+
 ## Códigos gerais
 
 | Código | Significado |
@@ -192,7 +214,10 @@ O ID local não pode aparecer na lista de pares. IDs repetidos e URLs sem `http`
 - JSON inválido ou identidade diferente da esperada: o par é tratado como resposta inválida.
 - Os demais pares e as operações locais continuam funcionando.
 - Na busca, os pares são consultados em paralelo. Os trechos válidos das empresas disponíveis ainda formam itinerários e o cliente recebe a indicação de busca parcial e os IDs dos pares indisponíveis.
+- Uma decisão pendente do coordenador é retomada após reinicialização. Falhas temporárias permanecem registradas e são tentadas novamente a cada segundo.
+- Se todos os participantes ainda estiverem preparados ou confirmados, a recuperação conclui o `commit`.
+- Se algum participante já tiver abortado por expiração, a recuperação compensa os demais e termina sem reserva parcial.
 
 ## Próximos recursos
 
-A próxima etapa aprofundará a recuperação automática do coordenador depois de uma queda ocorrida exatamente durante a decisão de confirmação e acrescentará o simulador de carga e falhas.
+O simulador autônomo, as métricas e a injeção automatizada de falhas estão documentados em [SIMULADOR.md](SIMULADOR.md).

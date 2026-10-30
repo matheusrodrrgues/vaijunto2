@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -112,6 +113,27 @@ func TestConsultaConsorcioRespeitaTimeout(t *testing.T) {
 	}
 	if len(saude.Pares) != 1 || saude.Pares[0].Disponivel || saude.Pares[0].Erro != "tempo limite excedido" {
 		t.Fatalf("resultado de timeout inesperado: %#v", saude.Pares)
+	}
+}
+
+func TestAPIRestExpoeDiagnosticoAgregadoSemDadosDeUsuarios(t *testing.T) {
+	estado := NovoEstadoEmpresa("empresa-a", "CaronasGo")
+	api := NovaAPIREST(configuracaoRESTTeste("empresa-a", "CaronasGo", nil, time.Second), estado)
+	resposta := httptest.NewRecorder()
+	api.ServeHTTP(resposta, httptest.NewRequest(http.MethodGet, "/api/v1/diagnostics/transactions", nil))
+	if resposta.Code != http.StatusOK {
+		t.Fatalf("status inesperado: %d", resposta.Code)
+	}
+	var resumo comum.ResumoTransacoesREST
+	conteudo := resposta.Body.Bytes()
+	if err := json.Unmarshal(conteudo, &resumo); err != nil {
+		t.Fatal(err)
+	}
+	if resumo.EmpresaID != "empresa-a" || resumo.Preparadas != 0 || resumo.CoordenacoesPendentes != 0 {
+		t.Fatalf("diagnóstico inesperado: %#v", resumo)
+	}
+	if strings.Contains(string(conteudo), "cliente") || strings.Contains(string(conteudo), "token") {
+		t.Fatal("o diagnóstico expôs dados de usuário")
 	}
 }
 

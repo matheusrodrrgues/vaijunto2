@@ -72,6 +72,12 @@ func (c *ConexaoTCP) Fechar() error {
 	return c.conexao.Close()
 }
 
+// DefinirPrazo limita leituras e escritas da conexão. Clientes interativos não
+// precisam usá-lo; simuladores evitam ficar presos a um servidor interrompido.
+func (c *ConexaoTCP) DefinirPrazo(prazo time.Time) error {
+	return c.conexao.SetDeadline(prazo)
+}
+
 func LerDados[T any](resposta Resposta) (T, error) {
 	var dados T
 	if len(resposta.Dados) == 0 {

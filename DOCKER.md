@@ -18,6 +18,16 @@ docker compose ps
 
 Os três contêineres escutam internamente em `9000` para clientes e `8080` para os outros servidores.
 
+## Executar o simulador
+
+Depois de publicar as caronas do cenário, execute:
+
+~~~powershell
+docker compose --profile teste run --rm simulador -requisicoes 100 -concorrencia 20 -origem "Salvador" -destino "Montes Claros" -data "2026-10-20"
+~~~
+
+Os relatórios ficam em `relatorios/`. A injeção que interrompe e restaura serviços Docker deve ser executada pelo simulador no computador hospedeiro, conforme [docs/SIMULADOR.md](docs/SIMULADOR.md).
+
 ## Verificar o isolamento
 
 ```sh

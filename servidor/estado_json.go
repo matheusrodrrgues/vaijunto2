@@ -21,6 +21,7 @@ type estadoArquivo struct {
 	Caronas        []comum.Carona          `json:"caronas"`
 	Reservas       []comum.Reserva         `json:"reservas"`
 	Transacoes     []transacaoParticipante `json:"transacoes,omitempty"`
+	Coordenacoes   []transacaoCoordenador  `json:"coordenacoes,omitempty"`
 }
 
 func NovoEstadoComArquivos(arquivoUsuarios, arquivoEstado string) (*Estado, error) {
@@ -85,6 +86,11 @@ func (e *Estado) carregarEstado() error {
 		transacao := salvo.Transacoes[i]
 		e.transacoes[transacao.ID] = &transacao
 	}
+	e.coordenacoes = make(map[string]*transacaoCoordenador)
+	for i := range salvo.Coordenacoes {
+		coordenacao := salvo.Coordenacoes[i]
+		e.coordenacoes[coordenacao.ID] = &coordenacao
+	}
 	e.proximaCarona = salvo.ProximaCarona
 	e.proximaReserva = salvo.ProximaReserva
 	return nil
@@ -100,9 +106,10 @@ func (e *Estado) salvarEstadoSemLock() error {
 	salvo := estadoArquivo{
 		EmpresaID:     e.empresaID,
 		ProximaCarona: e.proximaCarona, ProximaReserva: e.proximaReserva,
-		Caronas:    make([]comum.Carona, 0, len(e.caronas)),
-		Reservas:   make([]comum.Reserva, 0, len(e.reservas)),
-		Transacoes: make([]transacaoParticipante, 0, len(e.transacoes)),
+		Caronas:      make([]comum.Carona, 0, len(e.caronas)),
+		Reservas:     make([]comum.Reserva, 0, len(e.reservas)),
+		Transacoes:   make([]transacaoParticipante, 0, len(e.transacoes)),
+		Coordenacoes: make([]transacaoCoordenador, 0, len(e.coordenacoes)),
 	}
 	for _, carona := range e.caronas {
 		salvo.Caronas = append(salvo.Caronas, copiarCarona(carona))
@@ -113,9 +120,13 @@ func (e *Estado) salvarEstadoSemLock() error {
 	for _, transacao := range e.transacoes {
 		salvo.Transacoes = append(salvo.Transacoes, *transacao)
 	}
+	for _, coordenacao := range e.coordenacoes {
+		salvo.Coordenacoes = append(salvo.Coordenacoes, *coordenacao)
+	}
 	sort.Slice(salvo.Caronas, func(i, j int) bool { return salvo.Caronas[i].ID < salvo.Caronas[j].ID })
 	sort.Slice(salvo.Reservas, func(i, j int) bool { return salvo.Reservas[i].ID < salvo.Reservas[j].ID })
 	sort.Slice(salvo.Transacoes, func(i, j int) bool { return salvo.Transacoes[i].ID < salvo.Transacoes[j].ID })
+	sort.Slice(salvo.Coordenacoes, func(i, j int) bool { return salvo.Coordenacoes[i].ID < salvo.Coordenacoes[j].ID })
 
 	conteudo, err := json.MarshalIndent(salvo, "", "  ")
 	if err != nil {

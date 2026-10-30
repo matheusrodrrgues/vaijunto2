@@ -6,6 +6,8 @@ bin/
 *.exe
 logs/**/*.log
 dados/*/*.json
+relatorios/*.json
+relatorios/*.csv
 
 # Configurações locais
 .env

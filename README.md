@@ -38,6 +38,7 @@ Cada empresa executa seu próprio servidor e mantém usuários, caronas, reserva
 - [API REST entre empresas](docs/API_REST.md)
 - [Protocolo de comunicação](#protocolo-de-comunicacao)
 - [Testes](#testes)
+- [Simulador de carga e falhas](docs/SIMULADOR.md)
 - [Problemas comuns](#problemas-comuns)
 - [Limitações do protótipo](#limitacoes-do-prototipo)
 
@@ -97,6 +98,7 @@ vaijunto-parte-2/
 ├── cliente/                 # Cliente passageiro
 ├── motorista/               # Cliente motorista
 ├── servidor/                # Regras, rede, persistência e testes
+├── simulador/               # Carga concorrente, métricas e injeção de falhas
 ├── comum/                   # Modelos e protocolo compartilhados
 ├── terminal/                # Leitura e formatação dos menus
 ├── bin/                     # Executáveis do Windows
@@ -110,6 +112,7 @@ vaijunto-parte-2/
 ├── Dockerfile.servidor
 ├── Dockerfile.motorista
 ├── Dockerfile.cliente
+├── Dockerfile.simulador
 ├── compose.yaml
 ├── go.mod
 ├── iniciar.bat              # Inicia o servidor no Windows
@@ -593,6 +596,9 @@ O campo `vagas` do itinerário é uma informação de consulta, não uma contage
 | Trecho indisponível na confirmação | O coordenador aborta todos os participantes já preparados |
 | Dois passageiros disputam o último assento | O servidor dono do trecho aceita somente a primeira preparação que processar |
 | Preparação abandonada | O assento é liberado automaticamente ao vencer o prazo local |
+| Coordenador cai entre confirmações | Ao reiniciar, recupera a decisão durável e retoma os participantes |
+| Resposta de `commit` é perdida | Consulta o estado do participante antes de repetir |
+| Preparação expira durante a queda | Compensa os trechos já confirmados e termina sem reserva parcial |
 | Falha ao persistir uma alteração | Operação retorna erro |
 
 Os nomes dos campos e as ações são sensíveis à grafia. Campos desconhecidos são ignorados pelo decodificador atual. Os identificadores de requisição servem para correlação, não para deduplicação: repetir um pedido após perder a resposta não garante uma execução única. Consulte o estado antes de repetir uma operação cuja resposta foi perdida.
@@ -615,6 +621,10 @@ go test -v ./...
 | Cancelamento de carona | Cancela a reserva completa e devolve as vagas envolvidas |
 | 30 clientes TCP concorrentes | Somente um consegue reservar o último assento |
 | Persistência | Recupera caronas, reservas, vagas, cancelamentos e contador de caronas após reiniciar |
+| Recuperação do coordenador | Retoma um `commit` interrompido entre duas empresas |
+| Resposta REST perdida | Consulta o participante e não desconta o assento novamente |
+| Preparação expirada | Compensa participantes confirmados e não mantém reserva parcial |
+| 60 reservas distribuídas simultâneas | Confirma exatamente uma vez o último assento |
 | Cadastro | Recupera usuários do JSON e não grava a senha em texto puro |
 | Logs | Não registra senha nem token |
 
@@ -667,7 +677,8 @@ Esse comando usa uma imagem de desenvolvimento diferente da imagem Alpine final 
 
 - A interface dos usuários é de terminal; a API REST atende somente à comunicação entre servidores.
 - Busca, confirmação e cancelamento entre empresas estão implementados com preparação, confirmação, compensação e idempotência.
-- A recuperação automática do coordenador após uma queda exatamente durante a fase de confirmação ainda será aprofundada na próxima etapa.
+- A decisão do coordenador e os estados dos participantes sobrevivem à reinicialização; confirmações pendentes são retomadas ou compensadas automaticamente.
+- O simulador autônomo gera carga nas três empresas, injeta falhas via Docker e produz relatórios JSON/CSV.
 - A busca possui os limites descritos acima; as 20 opções retornadas não representam necessariamente todas as viagens existentes.
 - A consulta atual do motorista mostra o itinerário completo da reserva, sem agrupar os passageiros por trecho na tela.
 - O transporte não utiliza TLS e as senhas usam SHA-256 simples. São decisões de um protótipo acadêmico, não uma autenticação adequada para produção.
