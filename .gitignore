@@ -4,7 +4,8 @@ apresentacao/TUTORIAL_FACULDADE.md
 # Artefatos gerados localmente
 bin/
 *.exe
-logs/*.log
+logs/**/*.log
+dados/*/*.json
 
 # Configurações locais
 .env

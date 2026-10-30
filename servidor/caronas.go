@@ -36,6 +36,7 @@ func (e *Estado) PublicarCarona(token string, dados comum.PublicarCaronaDados) (
 
 	carona := &comum.Carona{
 		ID:                   id,
+		EmpresaID:            e.empresaID,
 		Motorista:            u.Login,
 		Rota:                 copiarStrings(dados.Rota),
 		Data:                 dados.Data,
