@@ -9,7 +9,7 @@ services:
     <<: *servidor-base
     environment:
       VAIJUNTO_EMPRESA_ID: empresa-a
-      VAIJUNTO_EMPRESA_NOME: Empresa A
+      VAIJUNTO_EMPRESA_NOME: CaronasGo
       VAIJUNTO_ADDR: :9000
       VAIJUNTO_REST_ADDR: :8080
       VAIJUNTO_REST_TIMEOUT: 2s
@@ -27,7 +27,7 @@ services:
     <<: *servidor-base
     environment:
       VAIJUNTO_EMPRESA_ID: empresa-b
-      VAIJUNTO_EMPRESA_NOME: Empresa B
+      VAIJUNTO_EMPRESA_NOME: LulaTransportes
       VAIJUNTO_ADDR: :9000
       VAIJUNTO_REST_ADDR: :8080
       VAIJUNTO_REST_TIMEOUT: 2s
@@ -45,7 +45,7 @@ services:
     <<: *servidor-base
     environment:
       VAIJUNTO_EMPRESA_ID: empresa-c
-      VAIJUNTO_EMPRESA_NOME: Empresa C
+      VAIJUNTO_EMPRESA_NOME: TetraCaronas
       VAIJUNTO_ADDR: :9000
       VAIJUNTO_REST_ADDR: :8080
       VAIJUNTO_REST_TIMEOUT: 2s

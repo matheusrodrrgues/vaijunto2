@@ -46,11 +46,11 @@ Cada empresa executa seu próprio servidor e mantém usuários, caronas, reserva
 
 ```mermaid
 flowchart LR
-    MA[Motorista A] <-->|TCP / JSON| A[Empresa A]
+    MA[Motorista] <-->|TCP / JSON| A[CaronasGo]
     PA[Passageiro A] <-->|TCP / JSON| A
     A --> DA[(Dados A)]
-    B[Empresa B] --> DB[(Dados B)]
-    C[Empresa C] --> DC[(Dados C)]
+    B[LulaTransportes] --> DB[(Dados B)]
+    C[TetraCaronas] --> DC[(Dados C)]
     A <-. REST / JSON .-> B
     B <-. REST / JSON .-> C
     A <-. REST / JSON .-> C
@@ -101,9 +101,9 @@ vaijunto-parte-2/
 ├── terminal/                # Leitura e formatação dos menus
 ├── bin/                     # Executáveis do Windows
 ├── dados/
-│   ├── empresa-a/           # Usuários e estado exclusivos da empresa A
-│   ├── empresa-b/           # Usuários e estado exclusivos da empresa B
-│   └── empresa-c/           # Usuários e estado exclusivos da empresa C
+│   ├── empresa-a/           # Usuários e estado exclusivos da CaronasGo
+│   ├── empresa-b/           # Usuários e estado exclusivos da LulaTransportes
+│   └── empresa-c/           # Usuários e estado exclusivos da TetraCaronas
 ├── logs/                    # Um subdiretório por empresa
 ├── docs/
 │   └── API_REST.md          # Contrato atual da comunicação entre servidores
@@ -169,15 +169,15 @@ Em um terceiro terminal:
 docker compose run --rm --no-deps cliente
 ```
 
-Os clientes precisam de terminais interativos. Nesta etapa, os clientes definidos no Compose pertencem à empresa A e usam `empresa-a:9000`.
+Os clientes precisam de terminais interativos. Nesta etapa, os clientes definidos no Compose pertencem à CaronasGo e usam `empresa-a:9000`.
 
 ### Comandos úteis
 
 | Comando | Resultado |
 | --- | --- |
 | `docker compose ps` | Mostra os serviços em execução |
-| `docker compose logs -f empresa-a` | Acompanha os eventos da empresa A |
-| `docker compose restart empresa-b` | Reinicia somente a empresa B |
+| `docker compose logs -f empresa-a` | Acompanha os eventos da CaronasGo |
+| `docker compose restart empresa-b` | Reinicia somente a LulaTransportes |
 | `docker compose stop motorista cliente` | Para clientes iniciados como serviços em segundo plano |
 | `docker compose down` | Encerra e remove os serviços do Compose e sua rede |
 
