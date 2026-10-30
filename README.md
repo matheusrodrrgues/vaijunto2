@@ -1,10 +1,10 @@
 <div align="center">
 
-# VaiJuntoAPP
+# VaiJuntoAPP - Consórcio
 
 **Caronas compartilhadas - TEC502**
 
-Servidor central e clientes de terminal desenvolvidos em Go, com comunicação por sockets TCP, mensagens JSON e execução em Docker.
+Evolução distribuída do VaiJunto: empresas independentes, clientes de terminal em Go e execução isolada com Docker.
 
 [Começar](#executar-com-docker) · [Como usar](#como-usar) · [Protocolo](#protocolo-de-comunicacao) · [Testes](#testes)
 
@@ -16,11 +16,11 @@ Servidor central e clientes de terminal desenvolvidos em Go, com comunicação p
 
 O VaiJunto permite que motoristas publiquem caronas e que passageiros reservem viagens diretas ou com conexão. Uma rota é dividida em trechos entre cidades consecutivas; cada trecho possui preço, duração e quantidade de assentos disponíveis.
 
-O servidor concentra usuários, caronas e reservas. Os dois clientes se comunicam com ele por TCP na porta `9000`. A aplicação utiliza apenas a biblioteca padrão do Go, sem banco de dados, framework web ou biblioteca de mensagens.
+Cada empresa executa seu próprio servidor e mantém usuários, caronas, reservas e logs em armazenamento exclusivo. Os clientes continuam se comunicando por TCP com o servidor de sua empresa. A API REST de cooperação entre empresas será implementada nas próximas etapas.
 
 | Componente | Responsabilidade |
 | --- | --- |
-| Servidor | Autenticar usuários, buscar itinerários, controlar vagas, confirmar reservas e salvar dados |
+| Servidor de empresa | Autenticar usuários locais, controlar caronas e vagas próprias e manter armazenamento isolado |
 | Motorista | Criar conta, publicar caronas, consultar caronas e passageiros, cancelar caronas |
 | Passageiro | Criar conta, buscar corridas, escolher uma data, reservar e cancelar reservas |
 
@@ -45,14 +45,17 @@ O servidor concentra usuários, caronas e reservas. Os dois clientes se comunica
 
 ```mermaid
 flowchart LR
-    M[Cliente motorista] <-->|TCP / JSON| S[Servidor central :9000]
-    P[Cliente passageiro] <-->|TCP / JSON| S
-    S --> U[usuarios.json]
-    S --> E[estado.json]
-    S --> L[servidor.log]
+    MA[Motorista A] <-->|TCP / JSON| A[Empresa A]
+    PA[Passageiro A] <-->|TCP / JSON| A
+    A --> DA[(Dados A)]
+    B[Empresa B] --> DB[(Dados B)]
+    C[Empresa C] --> DC[(Dados C)]
+    A -. REST nas próximas etapas .- B
+    B -. REST nas próximas etapas .- C
+    A -. REST nas próximas etapas .- C
 ```
 
-Motorista e passageiro acessam o mesmo servidor; não há comunicação direta entre os clientes. Os componentes podem executar no mesmo computador ou em máquinas diferentes da rede.
+Motorista e passageiro acessam exclusivamente o servidor da empresa em que estão cadastrados. Não existe armazenamento compartilhado entre as empresas. O `compose.yaml` inicia três instâncias com volumes e portas diferentes.
 
 Cada conexão aceita pelo servidor é atendida por uma goroutine. Um `sync.Mutex` protege os dados compartilhados: na confirmação de uma reserva, todos os trechos são verificados antes que qualquer assento seja descontado. Se um deles estiver indisponível, a reserva inteira é recusada.
 
@@ -64,7 +67,7 @@ Cada conexão aceita pelo servidor é atendida por uma goroutine. Um `sync.Mutex
 | Docker | Docker Engine/Desktop funcionando e Docker Compose v2 (`docker compose`) |
 | Código-fonte | Go 1.22 ou superior, conforme `go.mod` |
 | Executáveis Windows | Programas compilados em `bin/`; Go não é necessário para executá-los |
-| Máquinas diferentes | Acesso de rede ao servidor e porta TCP `9000` liberada |
+| Máquinas diferentes | Acesso de rede e portas configuradas para cada empresa |
 
 No Windows, a execução dos contêineres Linux depende do backend configurado no Docker Desktop, como o WSL 2. A primeira construção das imagens precisa de acesso ao registro de imagens. XAMPP e Apache não são necessários.
 
@@ -89,7 +92,7 @@ Não existem dependências Go externas nem etapa de instalação com `go get`. P
 ## Estrutura de diretórios
 
 ```text
-vaijunto/
+vaijunto-parte-2/
 ├── cliente/                 # Cliente passageiro
 ├── motorista/               # Cliente motorista
 ├── servidor/                # Regras, rede, persistência e testes
@@ -97,10 +100,10 @@ vaijunto/
 ├── terminal/                # Leitura e formatação dos menus
 ├── bin/                     # Executáveis do Windows
 ├── dados/
-│   ├── usuarios.json        # Contas e hashes de senha
-│   └── estado.json          # Caronas, reservas, vagas e contadores
-├── logs/
-│   └── servidor.log         # Eventos registrados pelo servidor
+│   ├── empresa-a/           # Usuários e estado exclusivos da empresa A
+│   ├── empresa-b/           # Usuários e estado exclusivos da empresa B
+│   └── empresa-c/           # Usuários e estado exclusivos da empresa C
+├── logs/                    # Um subdiretório por empresa
 ├── Dockerfile.servidor
 ├── Dockerfile.motorista
 ├── Dockerfile.cliente
@@ -119,6 +122,7 @@ Os arquivos JSON e de log são criados pelo servidor quando necessário.
 | Arquivo do servidor | Responsabilidade |
 | --- | --- |
 | `main.go` | Configuração, carregamento dos dados e abertura da porta |
+| `configuracao.go` | Identidade, caminhos e isolamento de cada empresa |
 | `rede.go` | Recebimento dos pedidos e envio das respostas |
 | `estrutura.go` | Mapas, contadores e mutex |
 | `autenticacao.go` | Cadastro, login e sessões |
@@ -132,24 +136,19 @@ Os arquivos JSON e de log são criados pelo servidor quando necessário.
 <a id="executar-com-docker"></a>
 ## Executar com Docker
 
-Abra um terminal na raiz do projeto. Para obter uma cópia:
+Abra um terminal na raiz de `vaijunto-parte-2`. O endereço do novo repositório remoto será incluído após sua criação no GitHub.
 
-```sh
-git clone https://github.com/matheusrodrrgues/vaijunto.git
-cd vaijunto
-```
+Confira se `docker version` mostra as seções **Client** e **Server**. As empresas publicam as portas `9001`, `9002` e `9003`.
 
-Confira se `docker version` mostra as seções **Client** e **Server**. Encerre um eventual servidor Windows que já esteja usando a porta `9000`.
-
-### 1. Construir as imagens e iniciar o servidor
+### 1. Construir as imagens e iniciar as empresas
 
 ```sh
 docker compose build
-docker compose up -d servidor
-docker compose logs -f servidor
+docker compose up -d empresa-a empresa-b empresa-c
+docker compose ps
 ```
 
-O último comando acompanha os logs. `Ctrl+C` encerra somente esse acompanhamento; o servidor permanece em segundo plano.
+Cada serviço possui identidade, volume de dados e volume de logs próprios.
 
 ### 2. Abrir o motorista
 
@@ -167,15 +166,15 @@ Em um terceiro terminal:
 docker compose run --rm --no-deps cliente
 ```
 
-Os clientes precisam de terminais interativos para receber as escolhas do menu. O servidor deve estar iniciado antes deles. Dentro da rede do Compose, os clientes usam `servidor:9000` automaticamente.
+Os clientes precisam de terminais interativos. Nesta etapa, os clientes definidos no Compose pertencem à empresa A e usam `empresa-a:9000`.
 
 ### Comandos úteis
 
 | Comando | Resultado |
 | --- | --- |
 | `docker compose ps` | Mostra os serviços em execução |
-| `docker compose logs -f servidor` | Acompanha os eventos do servidor |
-| `docker compose restart servidor` | Reinicia o servidor e recarrega os dados salvos |
+| `docker compose logs -f empresa-a` | Acompanha os eventos da empresa A |
+| `docker compose restart empresa-b` | Reinicia somente a empresa B |
 | `docker compose stop motorista cliente` | Para clientes iniciados como serviços em segundo plano |
 | `docker compose down` | Encerra e remove os serviços do Compose e sua rede |
 
@@ -190,8 +189,8 @@ Encerre os clientes interativos pela opção `0`. Depois de reiniciar o servidor
 | Construção do programa | `CGO_ENABLED=0 go build` |
 | Execução | Imagem `alpine:3.22`, contendo o executável compilado |
 | Inicialização | `ENTRYPOINT` específico para servidor, motorista ou passageiro |
-| Porta do servidor | `EXPOSE 9000`; o Compose publica `9000:9000` |
-| Persistência | Compose monta `./dados:/app/dados` e `./logs:/app/logs` |
+| Porta do servidor | `EXPOSE 9000`; o Compose publica `9001`, `9002` e `9003` |
+| Persistência | Cada empresa monta seus próprios diretórios em `/app/dados` e `/app/logs` |
 
 Não há bibliotecas externas a instalar. O compilador fica na etapa de construção; a imagem final contém apenas o ambiente de execução e o binário.
 
@@ -311,9 +310,9 @@ Os nomes das cidades são comparados ignorando maiúsculas/minúsculas e espaço
 
 | Arquivo | Conteúdo | Sobrevive à reinicialização? |
 | --- | --- | --- |
-| `dados/usuarios.json` | Nome, usuário, perfil e hash da senha | Sim |
-| `dados/estado.json` | Caronas, reservas, vagas, cancelamentos e contadores `CAR`/`RES` | Sim |
-| `logs/servidor.log` | Eventos de conexão e operações | Sim |
+| `dados/<empresa_id>/usuarios.json` | Contas exclusivas da empresa | Sim |
+| `dados/<empresa_id>/estado.json` | Caronas, reservas, vagas e identidade da empresa | Sim |
+| `logs/<empresa_id>/servidor.log` | Eventos exclusivos da instância | Sim |
 | Apenas em memória | Sessões, tokens e resultados temporários de busca `ITI` | Não |
 
 Caronas e reservas são gravadas juntas em `estado.json` após publicação, confirmação ou cancelamento, dentro do controle de concorrência do servidor. O código escreve um arquivo temporário antes de substituir o arquivo de estado. Se a gravação retornar erro, a operação informa falha e tenta desfazer as alterações em memória.
@@ -330,10 +329,14 @@ Os logs registram conexões, cadastros, tentativas de login, buscas, publicaçõ
 | Variável | Componente | Valor padrão | Finalidade |
 | --- | --- | --- | --- |
 | `VAIJUNTO_ADDR` | Servidor | `:9000` | Endereço de escuta TCP |
-| `VAIJUNTO_SERVER` | Clientes | `127.0.0.1:9000` | Endereço do servidor; no Compose, `servidor:9000` |
-| `VAIJUNTO_USUARIOS` | Servidor | `dados/usuarios.json` | Caminho das contas |
-| `VAIJUNTO_ESTADO` | Servidor | `dados/estado.json` | Caminho das caronas e reservas |
-| `VAIJUNTO_LOG` | Servidor | `logs/servidor.log` | Caminho dos logs |
+| `VAIJUNTO_SERVER` | Clientes | `127.0.0.1:9000` | Endereço da própria empresa; no Compose atual, `empresa-a:9000` |
+| `VAIJUNTO_EMPRESA_ID` | Servidor | `vaijunto` | ID estável da empresa, em minúsculas e sem espaços |
+| `VAIJUNTO_EMPRESA_NOME` | Servidor | `VaiJunto` | Nome exibido da empresa |
+| `VAIJUNTO_DADOS_DIR` | Servidor | `dados/<empresa_id>` | Diretório exclusivo de dados |
+| `VAIJUNTO_LOGS_DIR` | Servidor | `logs/<empresa_id>` | Diretório exclusivo de logs |
+| `VAIJUNTO_USUARIOS` | Servidor | `<dados>/usuarios.json` | Sobrescreve o caminho das contas |
+| `VAIJUNTO_ESTADO` | Servidor | `<dados>/estado.json` | Sobrescreve o caminho de caronas e reservas |
+| `VAIJUNTO_LOG` | Servidor | `<logs>/servidor.log` | Sobrescreve o caminho do log |
 
 Os caminhos relativos usam o diretório de execução do processo; no contêiner do servidor, ele é `/app`. Para personalizar variáveis no Docker, passe `-e` no `docker run` ou configure `environment` no Compose. Alterar a porta de escuta também exige ajustar a publicação de portas e o endereço dos clientes.
 
@@ -624,7 +627,7 @@ Esse comando usa uma imagem de desenvolvimento diferente da imagem Alpine final 
 
 1. Publique uma carona e confirme uma reserva.
 2. Confira a disponibilidade pelo motorista.
-3. Execute `docker compose restart servidor`.
+3. Execute `docker compose restart empresa-a`.
 4. Encerre os clientes antigos, abra-os novamente e faça login.
 5. Consulte caronas e reservas; as vagas e os registros devem permanecer.
 
@@ -648,7 +651,7 @@ Esse comando usa uma imagem de desenvolvimento diferente da imagem Alpine final 
 ## Limitações do protótipo
 
 - A interface é de terminal; não há aplicação web nem API REST.
-- Existe apenas um servidor central. Não execute duas instâncias compartilhando os mesmos JSON.
+- A API REST e as reservas entre empresas ainda não fazem parte da Etapa 1.
 - A busca possui os limites descritos acima; as 20 opções retornadas não representam necessariamente todas as viagens existentes.
 - A consulta atual do motorista mostra o itinerário completo da reserva, sem agrupar os passageiros por trecho na tela.
 - O transporte não utiliza TLS e as senhas usam SHA-256 simples. São decisões de um protótipo acadêmico, não uma autenticação adequada para produção.

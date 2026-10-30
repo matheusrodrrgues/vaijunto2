@@ -6,6 +6,7 @@ import "time"
 // a posição i corresponde ao deslocamento de Rota[i] para Rota[i+1].
 type Carona struct {
 	ID                   string   `json:"id"`
+	EmpresaID            string   `json:"empresa_id"`
 	Motorista            string   `json:"motorista"`
 	Rota                 []string `json:"rota"`
 	Data                 string   `json:"data"`

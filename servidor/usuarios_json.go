@@ -23,7 +23,11 @@ type usuarioArquivo struct {
 // NovoEstadoComArquivo carrega as contas antes de abrir o servidor.
 // As contas iniciais só são gravadas quando o arquivo ainda não existe.
 func NovoEstadoComArquivo(caminho string) (*Estado, error) {
-	estado := NovoEstado()
+	return novoEstadoEmpresaComArquivo(empresaPadraoID, empresaPadraoNome, caminho)
+}
+
+func novoEstadoEmpresaComArquivo(empresaID, empresaNome, caminho string) (*Estado, error) {
+	estado := NovoEstadoEmpresa(empresaID, empresaNome)
 	estado.arquivoUsuarios = caminho
 
 	conteudo, err := os.ReadFile(caminho)

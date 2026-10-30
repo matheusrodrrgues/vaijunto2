@@ -4,39 +4,31 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
 )
 
 func main() {
-	arquivoLog := os.Getenv("VAIJUNTO_LOG")
-	if arquivoLog == "" {
-		arquivoLog = "logs/servidor.log"
+	configuracao, err := carregarConfiguracaoServidor()
+	if err != nil {
+		log.Fatal("Configuração inválida: ", err)
 	}
-	logAberto, err := configurarRegistro(arquivoLog)
+
+	logAberto, err := configurarRegistro(configuracao.ArquivoLog)
 	if err != nil {
 		log.Fatal("Não foi possível abrir o arquivo de log: ", err)
 	}
 	defer logAberto.Close()
 
-	arquivoUsuarios := os.Getenv("VAIJUNTO_USUARIOS")
-	if arquivoUsuarios == "" {
-		arquivoUsuarios = "dados/usuarios.json"
-	}
-	arquivoEstado := os.Getenv("VAIJUNTO_ESTADO")
-	if arquivoEstado == "" {
-		arquivoEstado = "dados/estado.json"
-	}
-	estado, err := NovoEstadoComArquivos(arquivoUsuarios, arquivoEstado)
+	estado, err := NovoEstadoEmpresaComArquivos(
+		configuracao.EmpresaID,
+		configuracao.EmpresaNome,
+		configuracao.ArquivoUsuarios,
+		configuracao.ArquivoEstado,
+	)
 	if err != nil {
 		log.Fatal("Não foi possível carregar os dados: ", err)
 	}
 
-	endereco := os.Getenv("VAIJUNTO_ADDR")
-	if endereco == "" {
-		endereco = ":9000"
-	}
-
-	listener, err := net.Listen("tcp", endereco)
+	listener, err := net.Listen("tcp", configuracao.EnderecoTCP)
 	if err != nil {
 		log.Fatal("Não foi possível iniciar o servidor: ", err)
 	}
@@ -45,17 +37,19 @@ func main() {
 	_, porta, _ := net.SplitHostPort(listener.Addr().String())
 	fmt.Println()
 	fmt.Println("====================================")
-	fmt.Println("       SERVIDOR VAIJUNTO")
+	fmt.Println("      SERVIDOR DE EMPRESA")
 	fmt.Println("====================================")
+	fmt.Println("Empresa  :", configuracao.EmpresaNome)
+	fmt.Println("ID       :", configuracao.EmpresaID)
 	fmt.Println("Status   : ONLINE")
 	fmt.Println("Porta TCP:", porta)
-	fmt.Println("Usuários :", arquivoUsuarios)
-	fmt.Println("Estado   :", arquivoEstado)
-	fmt.Println("Logs     :", arquivoLog)
+	fmt.Println("Usuários :", configuracao.ArquivoUsuarios)
+	fmt.Println("Estado   :", configuracao.ArquivoEstado)
+	fmt.Println("Logs     :", configuracao.ArquivoLog)
 	fmt.Println("------------------------------------")
 	fmt.Println("Aguardando conexões...")
 	fmt.Println()
-	registrar("SERVIDOR_INICIADO porta=%s", porta)
+	registrar("SERVIDOR_INICIADO empresa=%s nome=%q porta=%s", configuracao.EmpresaID, configuracao.EmpresaNome, porta)
 
 	if err := ExecutarServidor(listener, estado); err != nil {
 		log.Fatal(err)

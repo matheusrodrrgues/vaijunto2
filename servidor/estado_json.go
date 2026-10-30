@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -14,6 +15,7 @@ import (
 // Caronas e reservas ficam juntas para não salvar uma sem as vagas da outra.
 // Login e buscas ficam de fora: ao voltar, o cliente entra e pesquisa novamente.
 type estadoArquivo struct {
+	EmpresaID      string          `json:"empresa_id"`
 	ProximaCarona  int             `json:"proxima_carona"`
 	ProximaReserva int             `json:"proxima_reserva"`
 	Caronas        []comum.Carona  `json:"caronas"`
@@ -21,7 +23,11 @@ type estadoArquivo struct {
 }
 
 func NovoEstadoComArquivos(arquivoUsuarios, arquivoEstado string) (*Estado, error) {
-	estado, err := NovoEstadoComArquivo(arquivoUsuarios)
+	return NovoEstadoEmpresaComArquivos(empresaPadraoID, empresaPadraoNome, arquivoUsuarios, arquivoEstado)
+}
+
+func NovoEstadoEmpresaComArquivos(empresaID, empresaNome, arquivoUsuarios, arquivoEstado string) (*Estado, error) {
+	estado, err := novoEstadoEmpresaComArquivo(empresaID, empresaNome, arquivoUsuarios)
 	if err != nil {
 		return nil, err
 	}
@@ -50,10 +56,19 @@ func (e *Estado) carregarEstado() error {
 	if err := json.Unmarshal(conteudo, &salvo); err != nil {
 		return err
 	}
+	if salvo.EmpresaID != "" && salvo.EmpresaID != e.empresaID {
+		return fmt.Errorf("estado pertence à empresa %q, não à empresa %q", salvo.EmpresaID, e.empresaID)
+	}
 
 	e.caronas = make(map[string]*comum.Carona)
 	for i := range salvo.Caronas {
 		carona := salvo.Caronas[i]
+		if carona.EmpresaID == "" {
+			carona.EmpresaID = e.empresaID
+		}
+		if carona.EmpresaID != e.empresaID {
+			return fmt.Errorf("carona %s pertence à empresa %q", carona.ID, carona.EmpresaID)
+		}
 		e.caronas[carona.ID] = &carona
 	}
 	e.reservas = make(map[string]*comum.Reserva)
@@ -74,6 +89,7 @@ func (e *Estado) salvarEstadoSemLock() error {
 	}
 
 	salvo := estadoArquivo{
+		EmpresaID:     e.empresaID,
 		ProximaCarona: e.proximaCarona, ProximaReserva: e.proximaReserva,
 		Caronas:  make([]comum.Carona, 0, len(e.caronas)),
 		Reservas: make([]comum.Reserva, 0, len(e.reservas)),

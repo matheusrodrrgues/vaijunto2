@@ -1,38 +1,62 @@
-# Execução com Docker em três máquinas
+# Execução das empresas com Docker
 
-Todos os computadores precisam estar na mesma rede e possuir Docker.
+Esta etapa executa três instâncias isoladas do servidor. Cada empresa possui identidade, diretório de dados, diretório de logs e porta externa próprios.
 
-## Máquina do servidor
+## Subir as três empresas
+
+```sh
+docker compose build
+docker compose up -d empresa-a empresa-b empresa-c
+docker compose ps
+```
+
+| Serviço | Identidade | Porta no computador | Dados | Logs |
+| --- | --- | --- | --- | --- |
+| `empresa-a` | `empresa-a` | `9001` | `dados/empresa-a/` | `logs/empresa-a/` |
+| `empresa-b` | `empresa-b` | `9002` | `dados/empresa-b/` | `logs/empresa-b/` |
+| `empresa-c` | `empresa-c` | `9003` | `dados/empresa-c/` | `logs/empresa-c/` |
+
+Os três contêineres escutam internamente em `9000`. As portas `9001`, `9002` e `9003` são apenas os acessos publicados no computador hospedeiro.
+
+## Verificar o isolamento
+
+```sh
+docker compose logs empresa-a
+docker compose logs empresa-b
+docker compose logs empresa-c
+```
+
+Cada inicialização informa o ID, o nome da empresa e os caminhos exclusivos. Publicar uma carona na empresa A não altera os arquivos das empresas B e C.
+
+## Abrir clientes da empresa A
+
+```sh
+docker compose run --rm --no-deps motorista
+docker compose run --rm --no-deps cliente
+```
+
+Nesta primeira etapa, os clientes do Compose apontam para `empresa-a:9000`. A seleção/configuração de outras empresas será ampliada nas etapas seguintes.
+
+## Executar uma empresa manualmente
 
 ```sh
 docker build -f Dockerfile.servidor -t vaijunto-servidor .
-docker run --name vaijunto-servidor --rm -p 9000:9000 -v "${PWD}/dados:/app/dados" -v "${PWD}/logs:/app/logs" vaijunto-servidor
+docker run --name empresa-a --rm -p 9001:9000 \
+  -e VAIJUNTO_EMPRESA_ID=empresa-a \
+  -e VAIJUNTO_EMPRESA_NOME="Empresa A" \
+  -e VAIJUNTO_DADOS_DIR=/app/dados \
+  -e VAIJUNTO_LOGS_DIR=/app/logs \
+  -v "${PWD}/dados/empresa-a:/app/dados" \
+  -v "${PWD}/logs/empresa-a:/app/logs" \
+  vaijunto-servidor
 ```
 
-As contas ficam em `dados/usuarios.json` e os registros ficam em `logs/servidor.log`. Os volumes mantêm esses arquivos quando o contêiner for recriado.
+Para executar em computadores distintos, use a mesma imagem e altere a identidade da empresa em cada máquina. A comunicação REST entre elas será adicionada na Etapa 2.
 
-Descubra o IPv4 dessa máquina com `ipconfig` no Windows ou `ip addr` no Linux. Também libere a porta TCP 9000 no firewall.
-
-## Máquina do motorista
+## Encerrar
 
 ```sh
-docker build -f Dockerfile.motorista -t vaijunto-motorista .
-docker run --name vaijunto-motorista --rm -it -e VAIJUNTO_SERVER=192.168.0.10:9000 vaijunto-motorista
+docker compose down
 ```
 
-## Máquina do passageiro
-
-```sh
-docker build -f Dockerfile.cliente -t vaijunto-cliente .
-docker run --name vaijunto-cliente --rm -it -e VAIJUNTO_SERVER=192.168.0.10:9000 vaijunto-cliente
-```
-
-Substitua `192.168.0.10` pelo IP da máquina do servidor.
-
-## Testar a rede
-
-```powershell
-Test-NetConnection 192.168.0.10 -Port 9000
-```
-
-O campo `TcpTestSucceeded` precisa aparecer como `True`.
+Os diretórios montados permanecem no computador depois que os contêineres são removidos.
