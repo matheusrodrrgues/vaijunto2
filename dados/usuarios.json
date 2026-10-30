@@ -1,0 +1,26 @@
+[
+  {
+    "nome": "Maria Passageira",
+    "usuario": "cliente",
+    "senha_hash": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+    "perfil": "passageiro"
+  },
+  {
+    "nome": "juliana",
+    "usuario": "juli",
+    "senha_hash": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+    "perfil": "passageiro"
+  },
+  {
+    "nome": "Joao Motorista",
+    "usuario": "motorista",
+    "senha_hash": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+    "perfil": "motorista"
+  },
+  {
+    "nome": "matheus",
+    "usuario": "theus",
+    "senha_hash": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+    "perfil": "motorista"
+  }
+]

@@ -1,0 +1,11 @@
+FROM golang:1.27-alpine AS compilacao
+WORKDIR /projeto
+COPY go.mod ./
+COPY comum ./comum
+COPY terminal ./terminal
+COPY cliente ./cliente
+RUN CGO_ENABLED=0 go build -o /vaijunto-cliente ./cliente
+
+FROM alpine:3.22
+COPY --from=compilacao /vaijunto-cliente /vaijunto-cliente
+ENTRYPOINT ["/vaijunto-cliente"]

@@ -1,0 +1,12 @@
+FROM golang:1.27-alpine AS compilacao
+WORKDIR /projeto
+COPY go.mod ./
+COPY comum ./comum
+COPY servidor ./servidor
+RUN CGO_ENABLED=0 go build -o /vaijunto-servidor ./servidor
+
+FROM alpine:3.22
+WORKDIR /app
+COPY --from=compilacao /vaijunto-servidor /app/vaijunto-servidor
+EXPOSE 9000
+ENTRYPOINT ["/app/vaijunto-servidor"]

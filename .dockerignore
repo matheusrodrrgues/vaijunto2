@@ -1,0 +1,6 @@
+.git
+bin
+*.bat
+README.md
+DOCKER.md
+PROTOCOLO.md
