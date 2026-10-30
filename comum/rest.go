@@ -83,6 +83,16 @@ type RespostaTransacaoREST struct {
 	Status      string `json:"status"`
 }
 
+type ResumoTransacoesREST struct {
+	EmpresaID              string `json:"empresa_id"`
+	Preparadas             int    `json:"preparadas"`
+	Confirmadas            int    `json:"confirmadas"`
+	Abortadas              int    `json:"abortadas"`
+	CoordenacoesPendentes  int    `json:"coordenacoes_pendentes"`
+	CoordenacoesConcluidas int    `json:"coordenacoes_concluidas"`
+	CoordenacoesAbortadas  int    `json:"coordenacoes_abortadas"`
+}
+
 type ErroREST struct {
 	Codigo   string `json:"codigo"`
 	Mensagem string `json:"mensagem"`

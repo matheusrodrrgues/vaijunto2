@@ -80,3 +80,19 @@ services:
     tty: true
     depends_on:
       - empresa-a
+
+  simulador:
+    build:
+      context: .
+      dockerfile: Dockerfile.simulador
+    profiles:
+      - teste
+    environment:
+      VAIJUNTO_SIM_EMPRESAS: empresa-a=empresa-a:9000,empresa-b=empresa-b:9000,empresa-c=empresa-c:9000
+      VAIJUNTO_SIM_REST: empresa-a=http://empresa-a:8080,empresa-b=http://empresa-b:8080,empresa-c=http://empresa-c:8080
+    volumes:
+      - ./relatorios:/app/relatorios
+    depends_on:
+      - empresa-a
+      - empresa-b
+      - empresa-c

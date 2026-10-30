@@ -34,8 +34,16 @@ func NovaAPIREST(configuracao ConfiguracaoServidor, estado *Estado) http.Handler
 	mux.HandleFunc("/api/v1/reservations/commit", api.confirmarReserva)
 	mux.HandleFunc("/api/v1/reservations/abort", api.abortarReserva)
 	mux.HandleFunc("/api/v1/reservations/status", api.consultarReserva)
+	mux.HandleFunc("/api/v1/diagnostics/transactions", api.resumoTransacoes)
 	mux.HandleFunc("/", recursoRESTNaoEncontrado)
 	return metadadosRequisicaoREST(mux)
+}
+
+func (a *APIREST) resumoTransacoes(w http.ResponseWriter, r *http.Request) {
+	if !permitirMetodo(w, r, http.MethodGet) {
+		return
+	}
+	escreverJSON(w, http.StatusOK, a.estado.ResumoTransacoes())
 }
 
 func (a *APIREST) prepararReserva(w http.ResponseWriter, r *http.Request) {

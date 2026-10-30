@@ -241,3 +241,30 @@ func respostaTransacao(empresaID string, transacao *transacaoParticipante) comum
 		EmpresaID: empresaID, TransacaoID: transacao.ID, Status: transacao.Status,
 	}
 }
+
+func (e *Estado) ResumoTransacoes() comum.ResumoTransacoesREST {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+	resumo := comum.ResumoTransacoesREST{EmpresaID: e.empresaID}
+	for _, transacao := range e.transacoes {
+		switch transacao.Status {
+		case comum.StatusTransacaoPreparada:
+			resumo.Preparadas++
+		case comum.StatusTransacaoConfirmada:
+			resumo.Confirmadas++
+		case comum.StatusTransacaoAbortada:
+			resumo.Abortadas++
+		}
+	}
+	for _, coordenacao := range e.coordenacoes {
+		switch coordenacao.Status {
+		case statusCoordenacaoCommit, statusCoordenacaoAbort:
+			resumo.CoordenacoesPendentes++
+		case statusCoordenacaoConcluida:
+			resumo.CoordenacoesConcluidas++
+		case statusCoordenacaoAbortada:
+			resumo.CoordenacoesAbortadas++
+		}
+	}
+	return resumo
+}

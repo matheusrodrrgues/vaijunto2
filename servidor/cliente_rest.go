@@ -159,6 +159,37 @@ func (c *ClienteRESTConsorcio) AbortarReserva(ctx context.Context, par EmpresaRe
 	return nil
 }
 
+func (c *ClienteRESTConsorcio) ConsultarReserva(ctx context.Context, par EmpresaRemota, transacaoID string) (comum.RespostaTransacaoREST, error) {
+	endpoint, err := url.Parse(par.URLBase + "/api/v1/reservations/status")
+	if err != nil {
+		return comum.RespostaTransacaoREST{}, err
+	}
+	consulta := endpoint.Query()
+	consulta.Set("transaction_id", transacaoID)
+	endpoint.RawQuery = consulta.Encode()
+	requisicao, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return comum.RespostaTransacaoREST{}, err
+	}
+	requisicao.Header.Set(comum.CabecalhoRequestID, novoIDRequisicaoHTTP())
+	respostaHTTP, err := c.httpClient.Do(requisicao)
+	if err != nil {
+		return comum.RespostaTransacaoREST{}, errors.New(normalizarErroComunicacao(err))
+	}
+	defer respostaHTTP.Body.Close()
+	if respostaHTTP.StatusCode != http.StatusOK {
+		return comum.RespostaTransacaoREST{}, fmt.Errorf("resposta HTTP %d", respostaHTTP.StatusCode)
+	}
+	var resposta comum.RespostaTransacaoREST
+	if err := json.NewDecoder(io.LimitReader(respostaHTTP.Body, limiteRespostaREST)).Decode(&resposta); err != nil {
+		return comum.RespostaTransacaoREST{}, errors.New("resposta JSON inválida")
+	}
+	if resposta.EmpresaID != par.ID || resposta.TransacaoID != transacaoID {
+		return comum.RespostaTransacaoREST{}, errors.New("identidade inesperada na resposta")
+	}
+	return resposta, nil
+}
+
 func (c *ClienteRESTConsorcio) enviarTransacao(ctx context.Context, par EmpresaRemota, caminho string, dados any, transacaoID string) (comum.RespostaTransacaoREST, error) {
 	corpo, err := json.Marshal(dados)
 	if err != nil {

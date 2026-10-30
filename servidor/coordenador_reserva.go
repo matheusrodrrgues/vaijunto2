@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"time"
 
 	"vaijunto/comum"
 )
@@ -103,46 +102,49 @@ func (e *Estado) confirmarReservaDistribuida(token, itinerarioID string) (comum.
 		preparados = append(preparados, participante)
 	}
 
-	for _, participante := range preparados {
-		if participante.local {
-			_, err = e.ConfirmarTransacao(transacaoID)
-		} else {
-			err = cliente.ConfirmarReserva(context.Background(), participante.par, transacaoID)
-		}
-		if err != nil {
-			e.abortarParticipantes(transacaoID, preparados, cliente)
-			liberarProcessamento()
-			return comum.Reserva{}, fmt.Errorf("não foi possível confirmar todos os trechos: %w", err)
-		}
-	}
-
-	e.mutex.Lock()
-	e.proximaReserva++
-	reserva := &comum.Reserva{
-		ID: fmt.Sprintf("RES-%03d", e.proximaReserva), TransacaoID: transacaoID,
-		Passageiro: passageiroLogin, NomePassageiro: passageiroNome,
-		Status: comum.StatusReservaConfirmada, CriadaEm: time.Now(), Itinerario: itinerario,
-	}
-	if reserva.Itinerario.Vagas > 0 {
-		reserva.Itinerario.Vagas--
-	}
-	pendente = e.itinerarios[itinerarioID]
-	pendente.Usado = true
-	pendente.EmProcessamento = false
-	e.reservas[reserva.ID] = reserva
-	if err := e.salvarEstadoSemLock(); err != nil {
-		delete(e.reservas, reserva.ID)
-		e.proximaReserva--
-		pendente.Usado = false
-		e.mutex.Unlock()
+	registro, err := e.registrarDecisaoCommit(
+		transacaoID, itinerarioID, passageiroLogin, passageiroNome, itinerario, preparados,
+	)
+	if err != nil {
 		e.abortarParticipantes(transacaoID, preparados, cliente)
-		return comum.Reserva{}, errors.New("não foi possível salvar a reserva distribuída")
+		liberarProcessamento()
+		return comum.Reserva{}, err
 	}
-	e.mutex.Unlock()
 
+	err = e.aplicarCommitCoordenacao(registro)
+	if errors.Is(err, errQuedaSimulada) {
+		// Usado pelos testes de reinicialização: representa o processo deixando
+		// de existir imediatamente, sem executar compensação em memória.
+		return comum.Reserva{}, err
+	}
+	if errors.Is(err, errParticipanteAbortado) {
+		if erroDecisao := e.decidirAbortarCoordenacao(transacaoID, err.Error()); erroDecisao != nil {
+			return comum.Reserva{}, erroDecisao
+		}
+		e.mutex.Lock()
+		registro = copiarCoordenacao(e.coordenacoes[transacaoID])
+		e.mutex.Unlock()
+		if erroAbort := e.aplicarAbortCoordenacao(registro); erroAbort != nil {
+			e.registrarErroRecuperacao(transacaoID, erroAbort)
+			return comum.Reserva{}, fmt.Errorf("reserva em recuperação: %w", erroAbort)
+		}
+		_ = e.concluirAbortoCoordenacao(transacaoID)
+		liberarProcessamento()
+		return comum.Reserva{}, errors.New("a reserva foi abortada porque um participante perdeu a preparação")
+	}
+	if err != nil {
+		e.registrarErroRecuperacao(transacaoID, err)
+		return comum.Reserva{}, fmt.Errorf("reserva em recuperação; consulte suas reservas novamente: %w", err)
+	}
+
+	reserva, err := e.concluirCoordenacao(transacaoID)
+	if err != nil {
+		e.registrarErroRecuperacao(transacaoID, err)
+		return comum.Reserva{}, fmt.Errorf("reserva em recuperação: %w", err)
+	}
 	registrar("RESERVA_DISTRIBUIDA_CONFIRMADA usuario=%s reserva=%s transacao=%s empresas=%d",
 		passageiroLogin, reserva.ID, transacaoID, len(participantes))
-	return *reserva, nil
+	return reserva, nil
 }
 
 func (e *Estado) montarParticipantes(itinerario comum.Itinerario, pares []EmpresaRemota) ([]participanteReserva, error) {
