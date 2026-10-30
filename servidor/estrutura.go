@@ -15,9 +15,18 @@ type usuario struct {
 }
 
 type itinerarioPendente struct {
-	Passageiro string
-	Itinerario comum.Itinerario
-	Usado      bool
+	Passageiro      string
+	Itinerario      comum.Itinerario
+	Usado           bool
+	EmProcessamento bool
+}
+
+type transacaoParticipante struct {
+	ID            string                      `json:"id"`
+	CoordenadorID string                      `json:"coordenador_id"`
+	Status        string                      `json:"status"`
+	Trechos       []comum.TrechoTransacaoREST `json:"trechos"`
+	ExpiraEm      time.Time                   `json:"expira_em"`
 }
 
 // Estado concentra os dados compartilhados entre os clientes.
@@ -34,6 +43,7 @@ type Estado struct {
 	caronas         map[string]*comum.Carona
 	reservas        map[string]*comum.Reserva
 	itinerarios     map[string]*itinerarioPendente
+	transacoes      map[string]*transacaoParticipante
 	pares           []EmpresaRemota
 	clienteREST     *ClienteRESTConsorcio
 	timeoutREST     time.Duration
@@ -70,6 +80,7 @@ func NovoEstadoEmpresa(empresaID, empresaNome string) *Estado {
 		caronas:     make(map[string]*comum.Carona),
 		reservas:    make(map[string]*comum.Reserva),
 		itinerarios: make(map[string]*itinerarioPendente),
+		transacoes:  make(map[string]*transacaoParticipante),
 		timeoutREST: 2 * time.Second,
 	}
 	estado.clienteREST = NovoClienteRESTConsorcio(estado.timeoutREST)

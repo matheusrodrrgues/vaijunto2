@@ -58,7 +58,7 @@ flowchart LR
 
 Motorista e passageiro acessam exclusivamente o servidor da empresa em que estão cadastrados. Não existe armazenamento compartilhado entre as empresas. O `compose.yaml` inicia três instâncias com volumes e portas diferentes.
 
-Cada conexão aceita pelo servidor é atendida por uma goroutine. Um `sync.Mutex` protege os dados compartilhados: na confirmação de uma reserva, todos os trechos são verificados antes que qualquer assento seja descontado. Se um deles estiver indisponível, a reserva inteira é recusada.
+Cada conexão aceita pelo servidor é atendida por uma goroutine. Reservas locais são protegidas por `sync.Mutex`. Nas viagens multiempresa, o servidor do passageiro coordena uma transação em duas fases: todas as empresas precisam preparar seus trechos antes da confirmação. Se uma delas recusar, as preparações anteriores são desfeitas.
 
 <a id="requisitos-e-pacotes"></a>
 ## Requisitos e pacotes
@@ -318,7 +318,7 @@ Os nomes das cidades são comparados ignorando maiúsculas/minúsculas e espaço
 | `logs/<empresa_id>/servidor.log` | Eventos exclusivos da instância | Sim |
 | Apenas em memória | Sessões, tokens e resultados temporários de busca `ITI` | Não |
 
-Caronas e reservas são gravadas juntas em `estado.json` após publicação, confirmação ou cancelamento, dentro do controle de concorrência do servidor. O código escreve um arquivo temporário antes de substituir o arquivo de estado. Se a gravação retornar erro, a operação informa falha e tenta desfazer as alterações em memória.
+Caronas, reservas e estados das transações participantes são gravados juntos em `estado.json`, dentro do controle de concorrência do servidor. O código escreve um arquivo temporário antes de substituir o arquivo de estado. Preparações sobrevivem à reinicialização e possuem prazo para não manter assentos bloqueados indefinidamente.
 
 O mecanismo atual remove o arquivo anterior antes da renomeação; portanto, ainda existe uma janela de perda em caso de interrupção nesse intervalo. Ele não oferece garantia de recuperação contra queda de energia. Para preservar uma demonstração, faça uma cópia da pasta `dados/` com o servidor parado. Não edite os JSON enquanto o servidor estiver rodando.
 
@@ -523,6 +523,7 @@ O servidor interpreta a data e o horário no fuso local do processo. Os exemplos
 | Campo | Tipo | Significado |
 | --- | --- | --- |
 | `id` | string | Código `RES` |
+| `transacao_id` | string | Identificador da transação quando a reserva envolve outras empresas |
 | `passageiro`, `nome_passageiro` | string | Usuário e nome do passageiro |
 | `status` | string | `confirmada`, `cancelada pelo passageiro` ou `cancelada pelo motorista` |
 | `criada_em` | string RFC 3339 | Instante da confirmação |
@@ -589,7 +590,9 @@ O campo `vagas` do itinerário é uma informação de consulta, não uma contage
 | Token inválido | Erro `faça login antes de continuar` |
 | Ação desconhecida | Resposta de erro, mantendo a conexão |
 | Carona ou reserva de outro usuário | Operação recusada |
-| Trecho indisponível na confirmação | Nenhum trecho da nova reserva é confirmado |
+| Trecho indisponível na confirmação | O coordenador aborta todos os participantes já preparados |
+| Dois passageiros disputam o último assento | O servidor dono do trecho aceita somente a primeira preparação que processar |
+| Preparação abandonada | O assento é liberado automaticamente ao vencer o prazo local |
 | Falha ao persistir uma alteração | Operação retorna erro |
 
 Os nomes dos campos e as ações são sensíveis à grafia. Campos desconhecidos são ignorados pelo decodificador atual. Os identificadores de requisição servem para correlação, não para deduplicação: repetir um pedido após perder a resposta não garante uma execução única. Consulte o estado antes de repetir uma operação cuja resposta foi perdida.
@@ -663,7 +666,8 @@ Esse comando usa uma imagem de desenvolvimento diferente da imagem Alpine final 
 ## Limitações do protótipo
 
 - A interface dos usuários é de terminal; a API REST atende somente à comunicação entre servidores.
-- A busca distribuída está implementada; a confirmação e o cancelamento atômicos entre empresas ainda serão implementados. Por segurança, uma opção multiempresa não é confirmada como se fosse local.
+- Busca, confirmação e cancelamento entre empresas estão implementados com preparação, confirmação, compensação e idempotência.
+- A recuperação automática do coordenador após uma queda exatamente durante a fase de confirmação ainda será aprofundada na próxima etapa.
 - A busca possui os limites descritos acima; as 20 opções retornadas não representam necessariamente todas as viagens existentes.
 - A consulta atual do motorista mostra o itinerário completo da reserva, sem agrupar os passageiros por trecho na tela.
 - O transporte não utiliza TLS e as senhas usam SHA-256 simples. São decisões de um protótipo acadêmico, não uma autenticação adequada para produção.

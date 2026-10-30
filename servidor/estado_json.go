@@ -15,11 +15,12 @@ import (
 // Caronas e reservas ficam juntas para não salvar uma sem as vagas da outra.
 // Login e buscas ficam de fora: ao voltar, o cliente entra e pesquisa novamente.
 type estadoArquivo struct {
-	EmpresaID      string          `json:"empresa_id"`
-	ProximaCarona  int             `json:"proxima_carona"`
-	ProximaReserva int             `json:"proxima_reserva"`
-	Caronas        []comum.Carona  `json:"caronas"`
-	Reservas       []comum.Reserva `json:"reservas"`
+	EmpresaID      string                  `json:"empresa_id"`
+	ProximaCarona  int                     `json:"proxima_carona"`
+	ProximaReserva int                     `json:"proxima_reserva"`
+	Caronas        []comum.Carona          `json:"caronas"`
+	Reservas       []comum.Reserva         `json:"reservas"`
+	Transacoes     []transacaoParticipante `json:"transacoes,omitempty"`
 }
 
 func NovoEstadoComArquivos(arquivoUsuarios, arquivoEstado string) (*Estado, error) {
@@ -33,6 +34,9 @@ func NovoEstadoEmpresaComArquivos(empresaID, empresaNome, arquivoUsuarios, arqui
 	}
 	estado.arquivoEstado = arquivoEstado
 	if err := estado.carregarEstado(); err != nil {
+		return nil, err
+	}
+	if err := estado.recuperarTransacoesPreparadas(); err != nil {
 		return nil, err
 	}
 	return estado, nil
@@ -76,6 +80,11 @@ func (e *Estado) carregarEstado() error {
 		reserva := salvo.Reservas[i]
 		e.reservas[reserva.ID] = &reserva
 	}
+	e.transacoes = make(map[string]*transacaoParticipante)
+	for i := range salvo.Transacoes {
+		transacao := salvo.Transacoes[i]
+		e.transacoes[transacao.ID] = &transacao
+	}
 	e.proximaCarona = salvo.ProximaCarona
 	e.proximaReserva = salvo.ProximaReserva
 	return nil
@@ -91,8 +100,9 @@ func (e *Estado) salvarEstadoSemLock() error {
 	salvo := estadoArquivo{
 		EmpresaID:     e.empresaID,
 		ProximaCarona: e.proximaCarona, ProximaReserva: e.proximaReserva,
-		Caronas:  make([]comum.Carona, 0, len(e.caronas)),
-		Reservas: make([]comum.Reserva, 0, len(e.reservas)),
+		Caronas:    make([]comum.Carona, 0, len(e.caronas)),
+		Reservas:   make([]comum.Reserva, 0, len(e.reservas)),
+		Transacoes: make([]transacaoParticipante, 0, len(e.transacoes)),
 	}
 	for _, carona := range e.caronas {
 		salvo.Caronas = append(salvo.Caronas, copiarCarona(carona))
@@ -100,8 +110,12 @@ func (e *Estado) salvarEstadoSemLock() error {
 	for _, reserva := range e.reservas {
 		salvo.Reservas = append(salvo.Reservas, *reserva)
 	}
+	for _, transacao := range e.transacoes {
+		salvo.Transacoes = append(salvo.Transacoes, *transacao)
+	}
 	sort.Slice(salvo.Caronas, func(i, j int) bool { return salvo.Caronas[i].ID < salvo.Caronas[j].ID })
 	sort.Slice(salvo.Reservas, func(i, j int) bool { return salvo.Reservas[i].ID < salvo.Reservas[j].ID })
+	sort.Slice(salvo.Transacoes, func(i, j int) bool { return salvo.Transacoes[i].ID < salvo.Transacoes[j].ID })
 
 	conteudo, err := json.MarshalIndent(salvo, "", "  ")
 	if err != nil {
