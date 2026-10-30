@@ -21,10 +21,14 @@ func buscarItinerarios(conexao *comum.ConexaoTCP) {
 	if !mostrarErro(resposta, err) {
 		return
 	}
-	itinerarios, err := comum.LerDados[[]comum.Itinerario](resposta)
+	resultado, err := comum.LerDados[comum.ResultadoBuscaItinerarios](resposta)
 	if err != nil {
 		fmt.Println("Resposta do servidor inválida:", err)
 		return
+	}
+	itinerarios := resultado.Itinerarios
+	if resultado.BuscaParcial {
+		fmt.Printf("Aviso: busca parcial; empresas indisponíveis: %v.\n", resultado.EmpresasIndisponiveis)
 	}
 	if len(itinerarios) == 0 {
 		fmt.Printf("Nenhuma corrida com vagas encontrada de %s para %s.\n",
@@ -68,10 +72,10 @@ func buscarItinerarios(conexao *comum.ConexaoTCP) {
 		fmt.Printf("   Total: %s | Conexões: %d | Vagas: %d\n",
 			terminal.FormatarDinheiro(itinerario.PrecoCentavos), itinerario.Conexoes, itinerario.Vagas)
 		for _, trecho := range itinerario.Trechos {
-			fmt.Printf("     %s -> %s | %s até %s | %s | %s\n",
+			fmt.Printf("     %s -> %s | %s até %s | %s | %s (%s)\n",
 				trecho.Origem, trecho.Destino,
 				trecho.Saida.Format("15:04"), trecho.Chegada.Format("15:04"),
-				terminal.FormatarDinheiro(trecho.PrecoCentavos), trecho.CaronaID)
+				terminal.FormatarDinheiro(trecho.PrecoCentavos), trecho.CaronaID, trecho.EmpresaID)
 		}
 	}
 

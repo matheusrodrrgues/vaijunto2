@@ -114,8 +114,8 @@ func processarPedido(estado *Estado, pedido comum.Pedido) comum.Resposta {
 		if err := lerPedido(pedido, &dados); err != nil {
 			return respostaErro(pedido.ID, err)
 		}
-		itinerarios, err := estado.BuscarItinerarios(pedido.Token, dados)
-		return respostaResultado(pedido.ID, "busca concluída", itinerarios, err)
+		resultado, err := estado.BuscarItinerariosDetalhado(pedido.Token, dados)
+		return respostaResultado(pedido.ID, "busca concluída", resultado, err)
 
 	case comum.AcaoConfirmarReserva:
 		var dados comum.IDDados

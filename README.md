@@ -16,7 +16,7 @@ Evolução distribuída do VaiJunto: empresas independentes, clientes de termina
 
 O VaiJunto permite que motoristas publiquem caronas e que passageiros reservem viagens diretas ou com conexão. Uma rota é dividida em trechos entre cidades consecutivas; cada trecho possui preço, duração e quantidade de assentos disponíveis.
 
-Cada empresa executa seu próprio servidor e mantém usuários, caronas, reservas e logs em armazenamento exclusivo. Os clientes continuam se comunicando por TCP com o servidor de sua empresa. Os servidores já possuem uma API REST para identificação, saúde e detecção de pares indisponíveis.
+Cada empresa executa seu próprio servidor e mantém usuários, caronas, reservas e logs em armazenamento exclusivo. Os clientes continuam se comunicando por TCP com o servidor de sua empresa. Pela API REST, os servidores identificam os pares, detectam indisponibilidade e consultam os catálogos de trechos para montar itinerários distribuídos.
 
 | Componente | Responsabilidade |
 | --- | --- |
@@ -278,7 +278,7 @@ Para publicar, informe a quantidade de cidades e a rota na ordem da viagem. Para
 | `4` | Cancelar reserva |
 | `0` | Encerrar o programa |
 
-Na busca, informe origem e destino, escolha uma das datas exibidas e selecione uma corrida pelo número. Confira preço, horários, conexões e vagas antes de confirmar com `s`. A consulta não bloqueia um assento: a disponibilidade é conferida novamente na confirmação.
+Na busca, informe origem e destino, escolha uma das datas exibidas e selecione uma corrida pelo número. Confira preço, horários, conexões, vagas e a empresa responsável por cada trecho. A consulta não bloqueia um assento. Se algum par não responder, o cliente avisa que o resultado é parcial e mantém as opções que não dependem dele.
 
 ### Exemplo de demonstração
 
@@ -410,7 +410,7 @@ O cadastro não devolve token: o login automático da interface é uma segunda r
 | `listar_caronas` | Sem parâmetros | Array de Carona do motorista, incluindo canceladas |
 | `listar_passageiros` | `id`: string com código `CAR` | Array de Reserva confirmada que utiliza a carona |
 | `cancelar_carona` | `id`: string com código `CAR` | Omitido |
-| `buscar_itinerarios` | `origem`, `destino`: strings; `data`: string opcional | Array de Itinerário |
+| `buscar_itinerarios` | `origem`, `destino`: strings; `data`: string opcional | Resultado com itinerários, indicador de busca parcial e empresas indisponíveis |
 | `confirmar_reserva` | `id`: string com código `ITI` | Objeto Reserva |
 | `listar_reservas` | Sem parâmetros | Array de Reserva do passageiro, incluindo canceladas |
 | `cancelar_reserva` | `id`: string com código `RES` | Omitido |
@@ -419,7 +419,7 @@ O cadastro não devolve token: o login automático da interface é uma segunda r
 
 Na publicação, `precos_centavos` e `duracoes_min` devem ter exatamente `len(rota) - 1` elementos. `assentos` deve ser positivo, preços não negativos e durações positivas. Datas e horários devem respeitar os formatos descritos acima.
 
-Na busca, omitir `data` ou enviar `""` consulta as datas disponíveis. A interface atual utiliza essa opção e permite selecionar uma data entre os resultados recebidos. Uma busca vazia é uma resposta bem-sucedida com `dados: []`.
+Na busca, omitir `data` ou enviar `""` consulta as datas disponíveis em todas as empresas alcançáveis. A interface permite selecionar uma data entre os resultados recebidos. Uma busca vazia é bem-sucedida com `itinerarios: []`.
 
 ### Exemplos de requisições
 
@@ -465,6 +465,7 @@ Resposta de publicação:
 
 | Campo de Trecho | Tipo | Significado |
 | --- | --- | --- |
+| `empresa_id` | string | Empresa responsável pela carona e pelos assentos |
 | `carona_id` | string | Carona responsável pelo trecho |
 | `indice` | inteiro | Posição do trecho na rota, começando em zero |
 | `motorista` | string | Usuário do motorista |
@@ -488,7 +489,9 @@ Exemplo de resposta de busca, com horários ilustrados em UTC:
   "id": "REQ-6",
   "sucesso": true,
   "mensagem": "busca concluída",
-  "dados": [{
+  "dados": {
+    "busca_parcial": false,
+    "itinerarios": [{
     "id": "ITI-001",
     "origem": "Feira de Santana",
     "destino": "Salvador",
@@ -497,6 +500,7 @@ Exemplo de resposta de busca, com horários ilustrados em UTC:
     "conexoes": 0,
     "vagas": 2,
     "trechos": [{
+      "empresa_id": "empresa-a",
       "carona_id": "CAR-001",
       "indice": 0,
       "motorista": "motorista",
@@ -506,7 +510,9 @@ Exemplo de resposta de busca, com horários ilustrados em UTC:
       "chegada": "2026-09-20T09:10:00Z",
       "preco_centavos": 3500
     }]
-  }]
+    }],
+    "empresas_indisponiveis": []
+  }
 }
 ```
 
@@ -568,7 +574,7 @@ O campo `vagas` do itinerário é uma informação de consulta, não uma contage
 {"id":"REQ-1","sucesso":true,"mensagem":"conta criada com sucesso"}
 {"id":"REQ-9","sucesso":true,"mensagem":"reserva cancelada"}
 {"id":"REQ-10","sucesso":true,"mensagem":"carona cancelada"}
-{"id":"REQ-6","sucesso":true,"mensagem":"busca concluída","dados":[]}
+{"id":"REQ-6","sucesso":true,"mensagem":"busca concluída","dados":{"itinerarios":[],"busca_parcial":false}}
 {"id":"REQ-2","sucesso":false,"mensagem":"usuário ou senha incorretos"}
 {"id":"REQ-7","sucesso":false,"mensagem":"um dos trechos ficou sem assento"}
 {"id":"REQ-11","sucesso":false,"mensagem":"operação desconhecida"}
@@ -657,7 +663,7 @@ Esse comando usa uma imagem de desenvolvimento diferente da imagem Alpine final 
 ## Limitações do protótipo
 
 - A interface dos usuários é de terminal; a API REST atende somente à comunicação entre servidores.
-- A busca e as reservas distribuídas ainda não foram implementadas.
+- A busca distribuída está implementada; a confirmação e o cancelamento atômicos entre empresas ainda serão implementados. Por segurança, uma opção multiempresa não é confirmada como se fosse local.
 - A busca possui os limites descritos acima; as 20 opções retornadas não representam necessariamente todas as viagens existentes.
 - A consulta atual do motorista mostra o itinerário completo da reserva, sem agrupar os passageiros por trecho na tela.
 - O transporte não utiliza TLS e as senhas usam SHA-256 simples. São decisões de um protótipo acadêmico, não uma autenticação adequada para produção.

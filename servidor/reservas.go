@@ -26,6 +26,11 @@ func (e *Estado) ConfirmarReserva(token, itinerarioID string) (comum.Reserva, er
 	if pendente.Usado {
 		return comum.Reserva{}, errors.New("este itinerário já foi utilizado")
 	}
+	for _, trecho := range pendente.Itinerario.Trechos {
+		if trecho.EmpresaID != "" && trecho.EmpresaID != e.empresaID {
+			return comum.Reserva{}, errors.New("a confirmação entre empresas será implementada na etapa de reserva distribuída")
+		}
+	}
 
 	// Primeiro confere tudo. Se faltar vaga no último trecho, não faz sentido
 	// deixar o passageiro com os primeiros trechos reservados.

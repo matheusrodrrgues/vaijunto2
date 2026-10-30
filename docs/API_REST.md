@@ -75,11 +75,42 @@ Resposta `200 OK`:
 
 As consultas são paralelas. Portanto, uma empresa lenta não soma seu timeout ao timeout das outras.
 
+## `GET /api/v1/rides/search`
+
+Devolve os trechos com vagas que pertencem à empresa consultada. O parâmetro opcional `date` filtra a data no formato `AAAA-MM-DD`. Sem o parâmetro, todas as datas disponíveis são retornadas.
+
+Exemplo: `GET /api/v1/rides/search?date=2026-10-20`
+
+Resposta `200 OK`:
+
+```json
+{
+  "empresa_id": "empresa-b",
+  "trechos": [
+    {
+      "empresa_id": "empresa-b",
+      "carona_id": "CAR-001",
+      "indice": 0,
+      "data": "2026-10-20",
+      "origem": "Feira de Santana",
+      "destino": "Vitória da Conquista",
+      "saida": "2026-10-20T09:20:00-03:00",
+      "chegada": "2026-10-20T11:20:00-03:00",
+      "preco_centavos": 3500,
+      "vagas": 2
+    }
+  ]
+}
+```
+
+Somente o catálogo necessário à montagem da rota é compartilhado. Contas, tokens e reservas não são expostos. O receptor valida a identidade da empresa, datas, horários, vagas e preços antes de aceitar os trechos.
+
 ## Códigos gerais
 
 | Código | Significado |
 | --- | --- |
 | `200 OK` | Requisição concluída |
+| `400 Bad Request` | Data em formato inválido |
 | `404 Not Found` | Recurso inexistente |
 | `405 Method Not Allowed` | Método não aceito pelo recurso |
 
@@ -99,7 +130,8 @@ O ID local não pode aparecer na lista de pares. IDs repetidos e URLs sem `http`
 - Timeout: a chamada é interrompida e o par recebe o erro `tempo limite excedido`.
 - JSON inválido ou identidade diferente da esperada: o par é tratado como resposta inválida.
 - Os demais pares e as operações locais continuam funcionando.
+- Na busca, os pares são consultados em paralelo. Os trechos válidos das empresas disponíveis ainda formam itinerários e o cliente recebe a indicação de busca parcial e os IDs dos pares indisponíveis.
 
 ## Próximos recursos
 
-As próximas etapas acrescentarão busca de caronas e os recursos transacionais `prepare`, `commit`, `abort` e consulta de estado. Esses recursos seguirão as mesmas convenções de request ID, timeout, erros JSON e idempotência.
+A próxima etapa acrescentará os recursos transacionais `prepare`, `commit`, `abort` e consulta de estado. Esses recursos seguirão as mesmas convenções de request ID, timeout, erros JSON e idempotência.

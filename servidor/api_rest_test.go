@@ -11,7 +11,7 @@ import (
 )
 
 func TestAPIRestInformaSaudeEPropagaRequestID(t *testing.T) {
-	api := NovaAPIREST(configuracaoRESTTeste("empresa-a", "Empresa A", nil, 200*time.Millisecond))
+	api := NovaAPIREST(configuracaoRESTTeste("empresa-a", "Empresa A", nil, 200*time.Millisecond), NovoEstadoEmpresa("empresa-a", "Empresa A"))
 	requisicao := httptest.NewRequest(http.MethodGet, "/api/v1/health", nil)
 	requisicao.Header.Set(comum.CabecalhoRequestID, "req-teste-123")
 	resposta := httptest.NewRecorder()
@@ -38,7 +38,7 @@ func TestAPIRestInformaSaudeEPropagaRequestID(t *testing.T) {
 }
 
 func TestAPIRestRecusaMetodoERecursoDesconhecido(t *testing.T) {
-	api := NovaAPIREST(configuracaoRESTTeste("empresa-a", "Empresa A", nil, time.Second))
+	api := NovaAPIREST(configuracaoRESTTeste("empresa-a", "Empresa A", nil, time.Second), NovoEstadoEmpresa("empresa-a", "Empresa A"))
 
 	respostaMetodo := httptest.NewRecorder()
 	api.ServeHTTP(respostaMetodo, httptest.NewRequest(http.MethodPost, "/api/v1/health", nil))
@@ -54,9 +54,9 @@ func TestAPIRestRecusaMetodoERecursoDesconhecido(t *testing.T) {
 }
 
 func TestConsultaConsorcioContinuaComEmpresaIndisponivel(t *testing.T) {
-	servidorB := httptest.NewServer(NovaAPIREST(configuracaoRESTTeste("empresa-b", "Empresa B", nil, time.Second)))
+	servidorB := httptest.NewServer(NovaAPIREST(configuracaoRESTTeste("empresa-b", "Empresa B", nil, time.Second), NovoEstadoEmpresa("empresa-b", "Empresa B")))
 	defer servidorB.Close()
-	servidorFora := httptest.NewServer(NovaAPIREST(configuracaoRESTTeste("empresa-c", "Empresa C", nil, time.Second)))
+	servidorFora := httptest.NewServer(NovaAPIREST(configuracaoRESTTeste("empresa-c", "Empresa C", nil, time.Second), NovoEstadoEmpresa("empresa-c", "Empresa C")))
 	urlFora := servidorFora.URL
 	servidorFora.Close()
 
@@ -64,7 +64,7 @@ func TestConsultaConsorcioContinuaComEmpresaIndisponivel(t *testing.T) {
 		{ID: "empresa-b", URLBase: servidorB.URL},
 		{ID: "empresa-c", URLBase: urlFora},
 	}
-	api := NovaAPIREST(configuracaoRESTTeste("empresa-a", "Empresa A", pares, 200*time.Millisecond))
+	api := NovaAPIREST(configuracaoRESTTeste("empresa-a", "Empresa A", pares, 200*time.Millisecond), NovoEstadoEmpresa("empresa-a", "Empresa A"))
 	resposta := httptest.NewRecorder()
 	api.ServeHTTP(resposta, httptest.NewRequest(http.MethodGet, "/api/v1/consortium/health", nil))
 
@@ -97,7 +97,7 @@ func TestConsultaConsorcioRespeitaTimeout(t *testing.T) {
 
 	api := NovaAPIREST(configuracaoRESTTeste("empresa-a", "Empresa A", []EmpresaRemota{
 		{ID: "empresa-b", URLBase: servidorLento.URL},
-	}, 40*time.Millisecond))
+	}, 40*time.Millisecond), NovoEstadoEmpresa("empresa-a", "Empresa A"))
 	inicio := time.Now()
 	resposta := httptest.NewRecorder()
 	api.ServeHTTP(resposta, httptest.NewRequest(http.MethodGet, "/api/v1/consortium/health", nil))
