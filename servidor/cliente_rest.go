@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"sort"
+	"strings"
 	"time"
 
 	"vaijunto/comum"
@@ -20,6 +22,99 @@ const limiteRespostaREST = 1 << 20 // 1 MiB
 // indisponível e não encerram a operação da empresa local.
 type ClienteRESTConsorcio struct {
 	httpClient *http.Client
+}
+
+type resultadoTrechosPar struct {
+	EmpresaID string
+	Trechos   []comum.TrechoDisponivelREST
+	Erro      string
+}
+
+// ConsultarTrechos busca somente o catálogo público de um par e rejeita
+// respostas cuja identidade ou conteúdo não correspondam à empresa esperada.
+func (c *ClienteRESTConsorcio) ConsultarTrechos(ctx context.Context, par EmpresaRemota, data string) ([]comum.TrechoDisponivelREST, error) {
+	endpoint, err := url.Parse(par.URLBase + "/api/v1/rides/search")
+	if err != nil {
+		return nil, err
+	}
+	if data != "" {
+		consulta := endpoint.Query()
+		consulta.Set("date", data)
+		endpoint.RawQuery = consulta.Encode()
+	}
+
+	requisicao, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	requisicao.Header.Set(comum.CabecalhoRequestID, novoIDRequisicaoHTTP())
+	resposta, err := c.httpClient.Do(requisicao)
+	if err != nil {
+		return nil, errors.New(normalizarErroComunicacao(err))
+	}
+	defer resposta.Body.Close()
+	if resposta.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("resposta HTTP %d", resposta.StatusCode)
+	}
+
+	var catalogo comum.RespostaBuscaTrechosREST
+	decoder := json.NewDecoder(io.LimitReader(resposta.Body, limiteRespostaREST))
+	if err := decoder.Decode(&catalogo); err != nil {
+		return nil, errors.New("resposta JSON inválida")
+	}
+	if catalogo.EmpresaID != par.ID {
+		return nil, errors.New("identidade inesperada na resposta")
+	}
+	for _, trecho := range catalogo.Trechos {
+		if err := validarTrechoRemoto(trecho, par.ID, data); err != nil {
+			return nil, err
+		}
+	}
+	return catalogo.Trechos, nil
+}
+
+func (c *ClienteRESTConsorcio) ConsultarTrechosPares(ctx context.Context, pares []EmpresaRemota, data string) ([]comum.TrechoDisponivelREST, []string) {
+	canal := make(chan resultadoTrechosPar, len(pares))
+	for _, par := range pares {
+		par := par
+		go func() {
+			trechos, err := c.ConsultarTrechos(ctx, par, data)
+			resultado := resultadoTrechosPar{EmpresaID: par.ID, Trechos: trechos}
+			if err != nil {
+				resultado.Erro = err.Error()
+			}
+			canal <- resultado
+		}()
+	}
+
+	trechos := make([]comum.TrechoDisponivelREST, 0)
+	indisponiveis := make([]string, 0)
+	for range pares {
+		resultado := <-canal
+		if resultado.Erro != "" {
+			indisponiveis = append(indisponiveis, resultado.EmpresaID)
+			registrar("BUSCA_REMOTA_FALHOU empresa=%s erro=%q", resultado.EmpresaID, resultado.Erro)
+			continue
+		}
+		trechos = append(trechos, resultado.Trechos...)
+	}
+	sort.Strings(indisponiveis)
+	return trechos, indisponiveis
+}
+
+func validarTrechoRemoto(t comum.TrechoDisponivelREST, empresaEsperada, dataEsperada string) error {
+	if t.EmpresaID != empresaEsperada || strings.TrimSpace(t.CaronaID) == "" || t.Indice < 0 ||
+		strings.TrimSpace(t.Origem) == "" || strings.TrimSpace(t.Destino) == "" ||
+		t.PrecoCentavos < 0 || t.Vagas < 1 || !t.Chegada.After(t.Saida) {
+		return errors.New("trecho remoto inválido")
+	}
+	if _, err := time.ParseInLocation("2006-01-02", t.Data, time.Local); err != nil {
+		return errors.New("data remota inválida")
+	}
+	if dataEsperada != "" && t.Data != dataEsperada {
+		return errors.New("data inesperada na resposta")
+	}
+	return nil
 }
 
 func NovoClienteRESTConsorcio(timeout time.Duration) *ClienteRESTConsorcio {

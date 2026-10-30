@@ -19,6 +19,7 @@ type Carona struct {
 }
 
 type TrechoItinerario struct {
+	EmpresaID     string    `json:"empresa_id"`
 	CaronaID      string    `json:"carona_id"`
 	Indice        int       `json:"indice"`
 	Motorista     string    `json:"motorista"`
@@ -40,6 +41,15 @@ type Itinerario struct {
 	Conexoes      int                `json:"conexoes"`
 	Vagas         int                `json:"vagas"`
 	Trechos       []TrechoItinerario `json:"trechos"`
+}
+
+// ResultadoBuscaItinerarios informa também se alguma empresa não respondeu.
+// Uma busca parcial ainda pode conter itinerários válidos que não dependem da
+// empresa indisponível.
+type ResultadoBuscaItinerarios struct {
+	Itinerarios           []Itinerario `json:"itinerarios"`
+	BuscaParcial          bool         `json:"busca_parcial"`
+	EmpresasIndisponiveis []string     `json:"empresas_indisponiveis,omitempty"`
 }
 
 // Reserva guarda o itinerário escolhido e continua no histórico se for cancelada.

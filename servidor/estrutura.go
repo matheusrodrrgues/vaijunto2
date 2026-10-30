@@ -2,6 +2,7 @@ package main
 
 import (
 	"sync"
+	"time"
 
 	"vaijunto/comum"
 )
@@ -33,10 +34,23 @@ type Estado struct {
 	caronas         map[string]*comum.Carona
 	reservas        map[string]*comum.Reserva
 	itinerarios     map[string]*itinerarioPendente
+	pares           []EmpresaRemota
+	clienteREST     *ClienteRESTConsorcio
+	timeoutREST     time.Duration
 
 	proximaCarona     int
 	proximoItinerario int
 	proximaReserva    int
+}
+
+// ConfigurarBuscaDistribuida informa ao estado quais empresas participam da
+// busca. Cada servidor continua dono apenas dos dados de sua própria empresa.
+func (e *Estado) ConfigurarBuscaDistribuida(pares []EmpresaRemota, timeout time.Duration) {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+	e.pares = append([]EmpresaRemota(nil), pares...)
+	e.timeoutREST = timeout
+	e.clienteREST = NovoClienteRESTConsorcio(timeout)
 }
 
 // NovoEstado prepara um servidor em memória, útil também nos testes.
@@ -56,7 +70,9 @@ func NovoEstadoEmpresa(empresaID, empresaNome string) *Estado {
 		caronas:     make(map[string]*comum.Carona),
 		reservas:    make(map[string]*comum.Reserva),
 		itinerarios: make(map[string]*itinerarioPendente),
+		timeoutREST: 2 * time.Second,
 	}
+	estado.clienteREST = NovoClienteRESTConsorcio(estado.timeoutREST)
 
 	estado.adicionarUsuario("João Motorista", "motorista", "1234", comum.PerfilMotorista)
 	estado.adicionarUsuario("Maria Passageira", "cliente", "1234", comum.PerfilPassageiro)

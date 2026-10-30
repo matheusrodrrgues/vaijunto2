@@ -29,6 +29,7 @@ func main() {
 	if err != nil {
 		log.Fatal("Não foi possível carregar os dados: ", err)
 	}
+	estado.ConfigurarBuscaDistribuida(configuracao.Pares, configuracao.TimeoutREST)
 
 	listenerTCP, err := net.Listen("tcp", configuracao.EnderecoTCP)
 	if err != nil {
@@ -41,7 +42,7 @@ func main() {
 		log.Fatal("Não foi possível iniciar a API REST: ", err)
 	}
 	defer listenerREST.Close()
-	servidorHTTP := novoServidorHTTP(configuracao)
+	servidorHTTP := novoServidorHTTP(configuracao, estado)
 
 	_, portaTCP, _ := net.SplitHostPort(listenerTCP.Addr().String())
 	_, portaREST, _ := net.SplitHostPort(listenerREST.Addr().String())

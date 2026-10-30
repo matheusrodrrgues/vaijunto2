@@ -16,18 +16,42 @@ import (
 type APIREST struct {
 	configuracao ConfiguracaoServidor
 	cliente      *ClienteRESTConsorcio
+	estado       *Estado
 }
 
-func NovaAPIREST(configuracao ConfiguracaoServidor) http.Handler {
+func NovaAPIREST(configuracao ConfiguracaoServidor, estado *Estado) http.Handler {
 	api := &APIREST{
 		configuracao: configuracao,
 		cliente:      NovoClienteRESTConsorcio(configuracao.TimeoutREST),
+		estado:       estado,
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/health", api.saudeEmpresa)
 	mux.HandleFunc("/api/v1/consortium/health", api.saudeConsorcio)
+	mux.HandleFunc("/api/v1/rides/search", api.buscarTrechos)
 	mux.HandleFunc("/", recursoRESTNaoEncontrado)
 	return metadadosRequisicaoREST(mux)
+}
+
+func (a *APIREST) buscarTrechos(w http.ResponseWriter, r *http.Request) {
+	if !permitirMetodo(w, r, http.MethodGet) {
+		return
+	}
+	data := strings.TrimSpace(r.URL.Query().Get("date"))
+	if data != "" {
+		if _, err := time.ParseInLocation("2006-01-02", data, time.Local); err != nil {
+			escreverErroREST(w, http.StatusBadRequest, "data_invalida", "date deve estar no formato AAAA-MM-DD")
+			return
+		}
+	}
+	if a.estado == nil {
+		escreverErroREST(w, http.StatusServiceUnavailable, "estado_indisponivel", "estado da empresa indisponível")
+		return
+	}
+	escreverJSON(w, http.StatusOK, comum.RespostaBuscaTrechosREST{
+		EmpresaID: a.configuracao.EmpresaID,
+		Trechos:   a.estado.ListarTrechosDisponiveisREST(data),
+	})
 }
 
 func (a *APIREST) saudeEmpresa(w http.ResponseWriter, r *http.Request) {
@@ -102,9 +126,9 @@ func novoIDRequisicaoHTTP() string {
 	return fmt.Sprintf("req-%d-%d", time.Now().UnixNano(), contadorRequestID.Add(1))
 }
 
-func novoServidorHTTP(configuracao ConfiguracaoServidor) *http.Server {
+func novoServidorHTTP(configuracao ConfiguracaoServidor, estado *Estado) *http.Server {
 	return &http.Server{
-		Handler:           NovaAPIREST(configuracao),
+		Handler:           NovaAPIREST(configuracao, estado),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,

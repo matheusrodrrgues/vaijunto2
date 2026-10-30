@@ -43,11 +43,11 @@ func TestVariosClientesDisputamMesmoAssento(t *testing.T) {
 		if err != nil || !resposta.Sucesso {
 			t.Fatalf("busca %d falhou: %v - %s", i, err, resposta.Mensagem)
 		}
-		opcoes, err := comum.LerDados[[]comum.Itinerario](resposta)
-		if err != nil || len(opcoes) == 0 {
+		resultado, err := comum.LerDados[comum.ResultadoBuscaItinerarios](resposta)
+		if err != nil || len(resultado.Itinerarios) == 0 {
 			t.Fatalf("busca %d não retornou opção: %v", i, err)
 		}
-		itinerarios = append(itinerarios, opcoes[0].ID)
+		itinerarios = append(itinerarios, resultado.Itinerarios[0].ID)
 	}
 	defer func() {
 		for _, cliente := range clientes {
