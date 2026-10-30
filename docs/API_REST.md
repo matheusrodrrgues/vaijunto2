@@ -33,7 +33,7 @@ Resposta `200 OK`:
 ```json
 {
   "empresa_id": "empresa-b",
-  "empresa_nome": "Empresa B",
+  "empresa_nome": "LulaTransportes",
   "status": "online"
 }
 ```
