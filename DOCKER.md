@@ -10,13 +10,13 @@ docker compose up -d empresa-a empresa-b empresa-c
 docker compose ps
 ```
 
-| Serviço | Identidade | Porta no computador | Dados | Logs |
-| --- | --- | --- | --- | --- |
-| `empresa-a` | `empresa-a` | `9001` | `dados/empresa-a/` | `logs/empresa-a/` |
-| `empresa-b` | `empresa-b` | `9002` | `dados/empresa-b/` | `logs/empresa-b/` |
-| `empresa-c` | `empresa-c` | `9003` | `dados/empresa-c/` | `logs/empresa-c/` |
+| Serviço | Identidade | TCP | REST | Dados | Logs |
+| --- | --- | --- | --- | --- | --- |
+| `empresa-a` | `empresa-a` | `9001` | `8081` | `dados/empresa-a/` | `logs/empresa-a/` |
+| `empresa-b` | `empresa-b` | `9002` | `8082` | `dados/empresa-b/` | `logs/empresa-b/` |
+| `empresa-c` | `empresa-c` | `9003` | `8083` | `dados/empresa-c/` | `logs/empresa-c/` |
 
-Os três contêineres escutam internamente em `9000`. As portas `9001`, `9002` e `9003` são apenas os acessos publicados no computador hospedeiro.
+Os três contêineres escutam internamente em `9000` para clientes e `8080` para os outros servidores.
 
 ## Verificar o isolamento
 
@@ -24,6 +24,7 @@ Os três contêineres escutam internamente em `9000`. As portas `9001`, `9002` e
 docker compose logs empresa-a
 docker compose logs empresa-b
 docker compose logs empresa-c
+curl http://localhost:8081/api/v1/consortium/health
 ```
 
 Cada inicialização informa o ID, o nome da empresa e os caminhos exclusivos. Publicar uma carona na empresa A não altera os arquivos das empresas B e C.
@@ -41,9 +42,12 @@ Nesta primeira etapa, os clientes do Compose apontam para `empresa-a:9000`. A se
 
 ```sh
 docker build -f Dockerfile.servidor -t vaijunto-servidor .
-docker run --name empresa-a --rm -p 9001:9000 \
+docker run --name empresa-a --rm -p 9001:9000 -p 8081:8080 \
   -e VAIJUNTO_EMPRESA_ID=empresa-a \
   -e VAIJUNTO_EMPRESA_NOME="Empresa A" \
+  -e VAIJUNTO_REST_ADDR=:8080 \
+  -e VAIJUNTO_REST_TIMEOUT=2s \
+  -e VAIJUNTO_PARES=empresa-b=http://IP_B:8080,empresa-c=http://IP_C:8080 \
   -e VAIJUNTO_DADOS_DIR=/app/dados \
   -e VAIJUNTO_LOGS_DIR=/app/logs \
   -v "${PWD}/dados/empresa-a:/app/dados" \
@@ -51,7 +55,7 @@ docker run --name empresa-a --rm -p 9001:9000 \
   vaijunto-servidor
 ```
 
-Para executar em computadores distintos, use a mesma imagem e altere a identidade da empresa em cada máquina. A comunicação REST entre elas será adicionada na Etapa 2.
+Para executar em computadores distintos, use a mesma imagem, altere a identidade e configure `VAIJUNTO_PARES` com os IPs REST das outras máquinas.
 
 ## Encerrar
 

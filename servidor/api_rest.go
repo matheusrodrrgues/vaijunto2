@@ -1,0 +1,113 @@
+package main
+
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strings"
+	"sync/atomic"
+	"time"
+
+	"vaijunto/comum"
+)
+
+type APIREST struct {
+	configuracao ConfiguracaoServidor
+	cliente      *ClienteRESTConsorcio
+}
+
+func NovaAPIREST(configuracao ConfiguracaoServidor) http.Handler {
+	api := &APIREST{
+		configuracao: configuracao,
+		cliente:      NovoClienteRESTConsorcio(configuracao.TimeoutREST),
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v1/health", api.saudeEmpresa)
+	mux.HandleFunc("/api/v1/consortium/health", api.saudeConsorcio)
+	mux.HandleFunc("/", recursoRESTNaoEncontrado)
+	return metadadosRequisicaoREST(mux)
+}
+
+func (a *APIREST) saudeEmpresa(w http.ResponseWriter, r *http.Request) {
+	if !permitirMetodo(w, r, http.MethodGet) {
+		return
+	}
+	escreverJSON(w, http.StatusOK, comum.SaudeEmpresa{
+		EmpresaID:   a.configuracao.EmpresaID,
+		EmpresaNome: a.configuracao.EmpresaNome,
+		Status:      comum.StatusEmpresaOnline,
+	})
+}
+
+func (a *APIREST) saudeConsorcio(w http.ResponseWriter, r *http.Request) {
+	if !permitirMetodo(w, r, http.MethodGet) {
+		return
+	}
+
+	pares := a.cliente.ConsultarPares(r.Context(), a.configuracao.Pares)
+	escreverJSON(w, http.StatusOK, comum.SaudeConsorcio{
+		EmpresaID: a.configuracao.EmpresaID,
+		Status:    comum.StatusEmpresaOnline,
+		Pares:     pares,
+	})
+}
+
+func recursoRESTNaoEncontrado(w http.ResponseWriter, _ *http.Request) {
+	escreverErroREST(w, http.StatusNotFound, "recurso_nao_encontrado", "recurso REST não encontrado")
+}
+
+func permitirMetodo(w http.ResponseWriter, r *http.Request, permitido string) bool {
+	if r.Method == permitido {
+		return true
+	}
+	w.Header().Set("Allow", permitido)
+	escreverErroREST(w, http.StatusMethodNotAllowed, "metodo_nao_permitido", "método HTTP não permitido")
+	return false
+}
+
+func escreverJSON(w http.ResponseWriter, status int, valor any) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(valor); err != nil {
+		registrarTecnico("REST_RESPOSTA_JSON_FALHOU erro=%q", err.Error())
+	}
+}
+
+func escreverErroREST(w http.ResponseWriter, status int, codigo, mensagem string) {
+	escreverJSON(w, status, comum.RespostaErroREST{
+		Erro: comum.ErroREST{Codigo: codigo, Mensagem: mensagem},
+	})
+}
+
+func metadadosRequisicaoREST(proximo http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestID := strings.TrimSpace(r.Header.Get(comum.CabecalhoRequestID))
+		if requestID == "" || len(requestID) > 128 {
+			requestID = novoIDRequisicaoHTTP()
+		}
+		w.Header().Set(comum.CabecalhoRequestID, requestID)
+		proximo.ServeHTTP(w, r)
+	})
+}
+
+var contadorRequestID atomic.Uint64
+
+func novoIDRequisicaoHTTP() string {
+	bytes := make([]byte, 12)
+	if _, err := rand.Read(bytes); err == nil {
+		return "req-" + hex.EncodeToString(bytes)
+	}
+	return fmt.Sprintf("req-%d-%d", time.Now().UnixNano(), contadorRequestID.Add(1))
+}
+
+func novoServidorHTTP(configuracao ConfiguracaoServidor) *http.Server {
+	return &http.Server{
+		Handler:           NovaAPIREST(configuracao),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+}

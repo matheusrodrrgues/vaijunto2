@@ -11,10 +11,14 @@ services:
       VAIJUNTO_EMPRESA_ID: empresa-a
       VAIJUNTO_EMPRESA_NOME: Empresa A
       VAIJUNTO_ADDR: :9000
+      VAIJUNTO_REST_ADDR: :8080
+      VAIJUNTO_REST_TIMEOUT: 2s
+      VAIJUNTO_PARES: empresa-b=http://empresa-b:8080,empresa-c=http://empresa-c:8080
       VAIJUNTO_DADOS_DIR: /app/dados
       VAIJUNTO_LOGS_DIR: /app/logs
     ports:
       - "9001:9000"
+      - "8081:8080"
     volumes:
       - ./dados/empresa-a:/app/dados
       - ./logs/empresa-a:/app/logs
@@ -25,10 +29,14 @@ services:
       VAIJUNTO_EMPRESA_ID: empresa-b
       VAIJUNTO_EMPRESA_NOME: Empresa B
       VAIJUNTO_ADDR: :9000
+      VAIJUNTO_REST_ADDR: :8080
+      VAIJUNTO_REST_TIMEOUT: 2s
+      VAIJUNTO_PARES: empresa-a=http://empresa-a:8080,empresa-c=http://empresa-c:8080
       VAIJUNTO_DADOS_DIR: /app/dados
       VAIJUNTO_LOGS_DIR: /app/logs
     ports:
       - "9002:9000"
+      - "8082:8080"
     volumes:
       - ./dados/empresa-b:/app/dados
       - ./logs/empresa-b:/app/logs
@@ -39,10 +47,14 @@ services:
       VAIJUNTO_EMPRESA_ID: empresa-c
       VAIJUNTO_EMPRESA_NOME: Empresa C
       VAIJUNTO_ADDR: :9000
+      VAIJUNTO_REST_ADDR: :8080
+      VAIJUNTO_REST_TIMEOUT: 2s
+      VAIJUNTO_PARES: empresa-a=http://empresa-a:8080,empresa-b=http://empresa-b:8080
       VAIJUNTO_DADOS_DIR: /app/dados
       VAIJUNTO_LOGS_DIR: /app/logs
     ports:
       - "9003:9000"
+      - "8083:8080"
     volumes:
       - ./dados/empresa-c:/app/dados
       - ./logs/empresa-c:/app/logs

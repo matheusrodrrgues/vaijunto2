@@ -16,7 +16,7 @@ Evolução distribuída do VaiJunto: empresas independentes, clientes de termina
 
 O VaiJunto permite que motoristas publiquem caronas e que passageiros reservem viagens diretas ou com conexão. Uma rota é dividida em trechos entre cidades consecutivas; cada trecho possui preço, duração e quantidade de assentos disponíveis.
 
-Cada empresa executa seu próprio servidor e mantém usuários, caronas, reservas e logs em armazenamento exclusivo. Os clientes continuam se comunicando por TCP com o servidor de sua empresa. A API REST de cooperação entre empresas será implementada nas próximas etapas.
+Cada empresa executa seu próprio servidor e mantém usuários, caronas, reservas e logs em armazenamento exclusivo. Os clientes continuam se comunicando por TCP com o servidor de sua empresa. Os servidores já possuem uma API REST para identificação, saúde e detecção de pares indisponíveis.
 
 | Componente | Responsabilidade |
 | --- | --- |
@@ -35,6 +35,7 @@ Cada empresa executa seu próprio servidor e mantém usuários, caronas, reserva
 - [Regras de funcionamento](#regras-de-funcionamento)
 - [Persistência e logs](#persistencia-e-logs)
 - [Configuração](#configuracao)
+- [API REST entre empresas](docs/API_REST.md)
 - [Protocolo de comunicação](#protocolo-de-comunicacao)
 - [Testes](#testes)
 - [Problemas comuns](#problemas-comuns)
@@ -50,9 +51,9 @@ flowchart LR
     A --> DA[(Dados A)]
     B[Empresa B] --> DB[(Dados B)]
     C[Empresa C] --> DC[(Dados C)]
-    A -. REST nas próximas etapas .- B
-    B -. REST nas próximas etapas .- C
-    A -. REST nas próximas etapas .- C
+    A <-. REST / JSON .-> B
+    B <-. REST / JSON .-> C
+    A <-. REST / JSON .-> C
 ```
 
 Motorista e passageiro acessam exclusivamente o servidor da empresa em que estão cadastrados. Não existe armazenamento compartilhado entre as empresas. O `compose.yaml` inicia três instâncias com volumes e portas diferentes.
@@ -104,6 +105,8 @@ vaijunto-parte-2/
 │   ├── empresa-b/           # Usuários e estado exclusivos da empresa B
 │   └── empresa-c/           # Usuários e estado exclusivos da empresa C
 ├── logs/                    # Um subdiretório por empresa
+├── docs/
+│   └── API_REST.md          # Contrato atual da comunicação entre servidores
 ├── Dockerfile.servidor
 ├── Dockerfile.motorista
 ├── Dockerfile.cliente
@@ -138,7 +141,7 @@ Os arquivos JSON e de log são criados pelo servidor quando necessário.
 
 Abra um terminal na raiz de `vaijunto-parte-2`. O endereço do novo repositório remoto será incluído após sua criação no GitHub.
 
-Confira se `docker version` mostra as seções **Client** e **Server**. As empresas publicam as portas `9001`, `9002` e `9003`.
+Confira se `docker version` mostra as seções **Client** e **Server**. As empresas publicam TCP em `9001`-`9003` e REST em `8081`-`8083`.
 
 ### 1. Construir as imagens e iniciar as empresas
 
@@ -189,7 +192,7 @@ Encerre os clientes interativos pela opção `0`. Depois de reiniciar o servidor
 | Construção do programa | `CGO_ENABLED=0 go build` |
 | Execução | Imagem `alpine:3.22`, contendo o executável compilado |
 | Inicialização | `ENTRYPOINT` específico para servidor, motorista ou passageiro |
-| Porta do servidor | `EXPOSE 9000`; o Compose publica `9001`, `9002` e `9003` |
+| Portas do servidor | `EXPOSE 9000 8080`; o Compose publica TCP em `9001`-`9003` e REST em `8081`-`8083` |
 | Persistência | Cada empresa monta seus próprios diretórios em `/app/dados` e `/app/logs` |
 
 Não há bibliotecas externas a instalar. O compilador fica na etapa de construção; a imagem final contém apenas o ambiente de execução e o binário.
@@ -329,6 +332,9 @@ Os logs registram conexões, cadastros, tentativas de login, buscas, publicaçõ
 | Variável | Componente | Valor padrão | Finalidade |
 | --- | --- | --- | --- |
 | `VAIJUNTO_ADDR` | Servidor | `:9000` | Endereço de escuta TCP |
+| `VAIJUNTO_REST_ADDR` | Servidor | `:8080` | Endereço da API REST entre empresas |
+| `VAIJUNTO_REST_TIMEOUT` | Servidor | `2s` | Timeout de cada chamada REST |
+| `VAIJUNTO_PARES` | Servidor | vazio | Pares no formato `id=http://host:porta` separados por vírgula |
 | `VAIJUNTO_SERVER` | Clientes | `127.0.0.1:9000` | Endereço da própria empresa; no Compose atual, `empresa-a:9000` |
 | `VAIJUNTO_EMPRESA_ID` | Servidor | `vaijunto` | ID estável da empresa, em minúsculas e sem espaços |
 | `VAIJUNTO_EMPRESA_NOME` | Servidor | `VaiJunto` | Nome exibido da empresa |
@@ -650,8 +656,8 @@ Esse comando usa uma imagem de desenvolvimento diferente da imagem Alpine final 
 <a id="limitacoes-do-prototipo"></a>
 ## Limitações do protótipo
 
-- A interface é de terminal; não há aplicação web nem API REST.
-- A API REST e as reservas entre empresas ainda não fazem parte da Etapa 1.
+- A interface dos usuários é de terminal; a API REST atende somente à comunicação entre servidores.
+- A busca e as reservas distribuídas ainda não foram implementadas.
 - A busca possui os limites descritos acima; as 20 opções retornadas não representam necessariamente todas as viagens existentes.
 - A consulta atual do motorista mostra o itinerário completo da reserva, sem agrupar os passageiros por trecho na tela.
 - O transporte não utiliza TLS e as senhas usam SHA-256 simples. São decisões de um protótipo acadêmico, não uma autenticação adequada para produção.

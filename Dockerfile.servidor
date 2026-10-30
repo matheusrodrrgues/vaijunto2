@@ -8,5 +8,5 @@ RUN CGO_ENABLED=0 go build -o /vaijunto-servidor ./servidor
 FROM alpine:3.22
 WORKDIR /app
 COPY --from=compilacao /vaijunto-servidor /app/vaijunto-servidor
-EXPOSE 9000
+EXPOSE 9000 8080
 ENTRYPOINT ["/app/vaijunto-servidor"]
