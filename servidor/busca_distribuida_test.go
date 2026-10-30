@@ -46,8 +46,25 @@ func TestBuscaDistribuidaCombinaTresEmpresas(t *testing.T) {
 			t.Fatalf("empresa do trecho %d: recebeu %q, esperava %q", i, trecho.EmpresaID, esperadas[i])
 		}
 	}
-	if _, err := estadoA.ConfirmarReserva(passageiro.Token, resultado.Itinerarios[0].ID); err == nil {
-		t.Fatal("a confirmação multiempresa deveria aguardar a etapa de reserva distribuída")
+	reserva, err := estadoA.ConfirmarReserva(passageiro.Token, resultado.Itinerarios[0].ID)
+	if err != nil {
+		t.Fatalf("confirmação distribuída falhou: %v", err)
+	}
+	if reserva.TransacaoID == "" || reserva.Status != comum.StatusReservaConfirmada {
+		t.Fatalf("reserva distribuída inválida: %#v", reserva)
+	}
+	for _, estado := range []*Estado{estadoA, estadoB, estadoC} {
+		if estado.caronas["CAR-001"].DisponiveisPorTrecho[0] != 0 {
+			t.Fatalf("empresa %s não confirmou seu trecho", estado.empresaID)
+		}
+	}
+	if err := estadoA.CancelarReserva(passageiro.Token, reserva.ID); err != nil {
+		t.Fatalf("cancelamento distribuído falhou: %v", err)
+	}
+	for _, estado := range []*Estado{estadoA, estadoB, estadoC} {
+		if estado.caronas["CAR-001"].DisponiveisPorTrecho[0] != 1 {
+			t.Fatalf("empresa %s não liberou seu trecho", estado.empresaID)
+		}
 	}
 }
 

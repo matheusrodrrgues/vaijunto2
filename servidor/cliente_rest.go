@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -121,6 +122,76 @@ func NovoClienteRESTConsorcio(timeout time.Duration) *ClienteRESTConsorcio {
 	return &ClienteRESTConsorcio{
 		httpClient: &http.Client{Timeout: timeout},
 	}
+}
+
+func (c *ClienteRESTConsorcio) PrepararReserva(ctx context.Context, par EmpresaRemota, dados comum.PrepararReservaREST) error {
+	resposta, err := c.enviarTransacao(ctx, par, "/api/v1/reservations/prepare", dados, dados.TransacaoID)
+	if err != nil {
+		return err
+	}
+	if resposta.Status != comum.StatusTransacaoPreparada && resposta.Status != comum.StatusTransacaoConfirmada {
+		return errors.New("estado inesperado na preparação")
+	}
+	return nil
+}
+
+func (c *ClienteRESTConsorcio) ConfirmarReserva(ctx context.Context, par EmpresaRemota, transacaoID string) error {
+	resposta, err := c.enviarTransacao(ctx, par, "/api/v1/reservations/commit",
+		comum.IdentificarTransacaoREST{TransacaoID: transacaoID}, transacaoID)
+	if err != nil {
+		return err
+	}
+	if resposta.Status != comum.StatusTransacaoConfirmada {
+		return errors.New("estado inesperado na confirmação")
+	}
+	return nil
+}
+
+func (c *ClienteRESTConsorcio) AbortarReserva(ctx context.Context, par EmpresaRemota, transacaoID string) error {
+	resposta, err := c.enviarTransacao(ctx, par, "/api/v1/reservations/abort",
+		comum.IdentificarTransacaoREST{TransacaoID: transacaoID}, transacaoID)
+	if err != nil {
+		return err
+	}
+	if resposta.Status != comum.StatusTransacaoAbortada {
+		return errors.New("estado inesperado no cancelamento")
+	}
+	return nil
+}
+
+func (c *ClienteRESTConsorcio) enviarTransacao(ctx context.Context, par EmpresaRemota, caminho string, dados any, transacaoID string) (comum.RespostaTransacaoREST, error) {
+	corpo, err := json.Marshal(dados)
+	if err != nil {
+		return comum.RespostaTransacaoREST{}, err
+	}
+	requisicao, err := http.NewRequestWithContext(ctx, http.MethodPost, par.URLBase+caminho, bytes.NewReader(corpo))
+	if err != nil {
+		return comum.RespostaTransacaoREST{}, err
+	}
+	requisicao.Header.Set("Content-Type", "application/json")
+	requisicao.Header.Set(comum.CabecalhoRequestID, novoIDRequisicaoHTTP())
+	requisicao.Header.Set(comum.CabecalhoIdempotencia, transacaoID)
+	respostaHTTP, err := c.httpClient.Do(requisicao)
+	if err != nil {
+		return comum.RespostaTransacaoREST{}, errors.New(normalizarErroComunicacao(err))
+	}
+	defer respostaHTTP.Body.Close()
+	if respostaHTTP.StatusCode != http.StatusOK {
+		var respostaErro comum.RespostaErroREST
+		_ = json.NewDecoder(io.LimitReader(respostaHTTP.Body, limiteRespostaREST)).Decode(&respostaErro)
+		if respostaErro.Erro.Mensagem != "" {
+			return comum.RespostaTransacaoREST{}, errors.New(respostaErro.Erro.Mensagem)
+		}
+		return comum.RespostaTransacaoREST{}, fmt.Errorf("resposta HTTP %d", respostaHTTP.StatusCode)
+	}
+	var resposta comum.RespostaTransacaoREST
+	if err := json.NewDecoder(io.LimitReader(respostaHTTP.Body, limiteRespostaREST)).Decode(&resposta); err != nil {
+		return comum.RespostaTransacaoREST{}, errors.New("resposta JSON inválida")
+	}
+	if resposta.EmpresaID != par.ID || resposta.TransacaoID != transacaoID {
+		return comum.RespostaTransacaoREST{}, errors.New("identidade inesperada na resposta")
+	}
+	return resposta, nil
 }
 
 func (c *ClienteRESTConsorcio) ConsultarSaude(ctx context.Context, par EmpresaRemota) comum.SaudePar {

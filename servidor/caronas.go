@@ -150,7 +150,7 @@ func (e *Estado) CancelarCarona(token, caronaID string) error {
 	caronasAntes, reservasAntes := e.copiarDadosSemLock()
 	carona.Cancelada = true
 	for _, reserva := range e.reservas {
-		if reserva.Status != comum.StatusReservaConfirmada || !usaCarona(reserva, caronaID) {
+		if reserva.Status != comum.StatusReservaConfirmada || !usaCarona(reserva, e.empresaID, caronaID) {
 			continue
 		}
 		e.devolverAssentosSemLock(reserva)
@@ -185,7 +185,7 @@ func (e *Estado) ListarPassageiros(token, caronaID string) ([]comum.Reserva, err
 
 	lista := make([]comum.Reserva, 0)
 	for _, reserva := range e.reservas {
-		if reserva.Status == comum.StatusReservaConfirmada && usaCarona(reserva, caronaID) {
+		if reserva.Status == comum.StatusReservaConfirmada && usaCarona(reserva, e.empresaID, caronaID) {
 			lista = append(lista, *reserva)
 		}
 	}
@@ -193,9 +193,9 @@ func (e *Estado) ListarPassageiros(token, caronaID string) ([]comum.Reserva, err
 	return lista, nil
 }
 
-func usaCarona(reserva *comum.Reserva, caronaID string) bool {
+func usaCarona(reserva *comum.Reserva, empresaID, caronaID string) bool {
 	for _, trecho := range reserva.Itinerario.Trechos {
-		if trecho.CaronaID == caronaID {
+		if trecho.CaronaID == caronaID && (trecho.EmpresaID == "" || trecho.EmpresaID == empresaID) {
 			return true
 		}
 	}

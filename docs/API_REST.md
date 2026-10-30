@@ -105,12 +105,73 @@ Resposta `200 OK`:
 
 Somente o catálogo necessário à montagem da rota é compartilhado. Contas, tokens e reservas não são expostos. O receptor valida a identidade da empresa, datas, horários, vagas e preços antes de aceitar os trechos.
 
+## Reserva distribuída
+
+O servidor da empresa do passageiro coordena apenas a reserva em andamento; não existe coordenador fixo no consórcio. Os participantes são processados em ordem crescente de ID da empresa para evitar espera circular.
+
+~~~mermaid
+sequenceDiagram
+    participant C as Coordenador
+    participant A as CaronasGo
+    participant B as LulaTransportes
+    participant T as TetraCaronas
+    C->>A: prepare(tx, trechos)
+    A-->>C: preparada
+    C->>B: prepare(tx, trechos)
+    B-->>C: preparada
+    C->>T: prepare(tx, trechos)
+    T-->>C: preparada
+    C->>A: commit(tx)
+    C->>B: commit(tx)
+    C->>T: commit(tx)
+~~~
+
+Se qualquer preparação ou confirmação falhar, o coordenador envia `abort` aos participantes já contatados. Preparações abandonadas possuem prazo contado pelo relógio local de cada participante e liberam os assentos automaticamente. As operações são idempotentes pela `transacao_id` e pelo cabeçalho `Idempotency-Key`.
+
+### `POST /api/v1/reservations/prepare`
+
+~~~json
+{
+  "transacao_id": "tx-empresa-a-req-123",
+  "coordenador_id": "empresa-a",
+  "duracao_bloqueio_ms": 15000,
+  "trechos": [
+    {"carona_id": "CAR-001", "indice": 0}
+  ]
+}
+~~~
+
+Resposta `200 OK`: `{"empresa_id":"empresa-b","transacao_id":"tx-empresa-a-req-123","status":"preparada"}`.
+
+Se o assento já estiver reservado ou preparado por outra transação, responde `409 Conflict`. A precedência é definida pela ordem em que o servidor proprietário processa as preparações sob sua trava local; relógios de servidores diferentes não são comparados.
+
+### `POST /api/v1/reservations/commit`
+
+Confirma os assentos preparados. Repetir a mesma operação produz o mesmo resultado.
+
+~~~json
+{"transacao_id":"tx-empresa-a-req-123"}
+~~~
+
+### `POST /api/v1/reservations/abort`
+
+Libera os assentos da transação. Também é idempotente e pode compensar uma confirmação quando o coordenador não conseguiu concluir todos os participantes.
+
+~~~json
+{"transacao_id":"tx-empresa-a-req-123"}
+~~~
+
+### `GET /api/v1/reservations/status?transaction_id=...`
+
+Consulta o estado local da transação: `preparada`, `confirmada` ou `abortada`.
+
 ## Códigos gerais
 
 | Código | Significado |
 | --- | --- |
 | `200 OK` | Requisição concluída |
 | `400 Bad Request` | Data em formato inválido |
+| `409 Conflict` | Preparação ou transição recusada |
 | `404 Not Found` | Recurso inexistente |
 | `405 Method Not Allowed` | Método não aceito pelo recurso |
 
@@ -134,4 +195,4 @@ O ID local não pode aparecer na lista de pares. IDs repetidos e URLs sem `http`
 
 ## Próximos recursos
 
-A próxima etapa acrescentará os recursos transacionais `prepare`, `commit`, `abort` e consulta de estado. Esses recursos seguirão as mesmas convenções de request ID, timeout, erros JSON e idempotência.
+A próxima etapa aprofundará a recuperação automática do coordenador depois de uma queda ocorrida exatamente durante a decisão de confirmação e acrescentará o simulador de carga e falhas.

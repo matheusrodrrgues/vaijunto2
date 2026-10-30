@@ -52,6 +52,37 @@ type RespostaBuscaTrechosREST struct {
 	Trechos   []TrechoDisponivelREST `json:"trechos"`
 }
 
+const (
+	StatusTransacaoPreparada  = "preparada"
+	StatusTransacaoConfirmada = "confirmada"
+	StatusTransacaoAbortada   = "abortada"
+)
+
+type TrechoTransacaoREST struct {
+	CaronaID string `json:"carona_id"`
+	Indice   int    `json:"indice"`
+}
+
+// PrepararReservaREST inicia a fase de preparação do protocolo de reserva.
+// O prazo é contado pelo relógio do participante, sem pressupor relógios
+// sincronizados entre as empresas.
+type PrepararReservaREST struct {
+	TransacaoID       string                `json:"transacao_id"`
+	CoordenadorID     string                `json:"coordenador_id"`
+	DuracaoBloqueioMS int64                 `json:"duracao_bloqueio_ms"`
+	Trechos           []TrechoTransacaoREST `json:"trechos"`
+}
+
+type IdentificarTransacaoREST struct {
+	TransacaoID string `json:"transacao_id"`
+}
+
+type RespostaTransacaoREST struct {
+	EmpresaID   string `json:"empresa_id"`
+	TransacaoID string `json:"transacao_id"`
+	Status      string `json:"status"`
+}
+
 type ErroREST struct {
 	Codigo   string `json:"codigo"`
 	Mensagem string `json:"mensagem"`

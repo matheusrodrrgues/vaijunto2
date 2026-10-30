@@ -55,6 +55,7 @@ type ResultadoBuscaItinerarios struct {
 // Reserva guarda o itinerário escolhido e continua no histórico se for cancelada.
 type Reserva struct {
 	ID             string     `json:"id"`
+	TransacaoID    string     `json:"transacao_id,omitempty"`
 	Passageiro     string     `json:"passageiro"`
 	NomePassageiro string     `json:"nome_passageiro"`
 	Status         string     `json:"status"`

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -29,8 +30,100 @@ func NovaAPIREST(configuracao ConfiguracaoServidor, estado *Estado) http.Handler
 	mux.HandleFunc("/api/v1/health", api.saudeEmpresa)
 	mux.HandleFunc("/api/v1/consortium/health", api.saudeConsorcio)
 	mux.HandleFunc("/api/v1/rides/search", api.buscarTrechos)
+	mux.HandleFunc("/api/v1/reservations/prepare", api.prepararReserva)
+	mux.HandleFunc("/api/v1/reservations/commit", api.confirmarReserva)
+	mux.HandleFunc("/api/v1/reservations/abort", api.abortarReserva)
+	mux.HandleFunc("/api/v1/reservations/status", api.consultarReserva)
 	mux.HandleFunc("/", recursoRESTNaoEncontrado)
 	return metadadosRequisicaoREST(mux)
+}
+
+func (a *APIREST) prepararReserva(w http.ResponseWriter, r *http.Request) {
+	if !permitirMetodo(w, r, http.MethodPost) {
+		return
+	}
+	var dados comum.PrepararReservaREST
+	if err := lerJSONREST(r, &dados); err != nil {
+		escreverErroREST(w, http.StatusBadRequest, "requisicao_invalida", err.Error())
+		return
+	}
+	resposta, err := a.estado.PrepararTransacao(dados)
+	if err != nil {
+		escreverErroREST(w, http.StatusConflict, "preparacao_recusada", err.Error())
+		return
+	}
+	escreverJSON(w, http.StatusOK, resposta)
+}
+
+func (a *APIREST) confirmarReserva(w http.ResponseWriter, r *http.Request) {
+	if !permitirMetodo(w, r, http.MethodPost) {
+		return
+	}
+	dados, ok := lerIdentificacaoTransacao(w, r)
+	if !ok {
+		return
+	}
+	resposta, err := a.estado.ConfirmarTransacao(dados.TransacaoID)
+	if err != nil {
+		escreverErroREST(w, http.StatusConflict, "confirmacao_recusada", err.Error())
+		return
+	}
+	escreverJSON(w, http.StatusOK, resposta)
+}
+
+func (a *APIREST) abortarReserva(w http.ResponseWriter, r *http.Request) {
+	if !permitirMetodo(w, r, http.MethodPost) {
+		return
+	}
+	dados, ok := lerIdentificacaoTransacao(w, r)
+	if !ok {
+		return
+	}
+	resposta, err := a.estado.AbortarTransacao(dados.TransacaoID)
+	if err != nil {
+		escreverErroREST(w, http.StatusConflict, "cancelamento_recusado", err.Error())
+		return
+	}
+	escreverJSON(w, http.StatusOK, resposta)
+}
+
+func (a *APIREST) consultarReserva(w http.ResponseWriter, r *http.Request) {
+	if !permitirMetodo(w, r, http.MethodGet) {
+		return
+	}
+	transacaoID := strings.TrimSpace(r.URL.Query().Get("transaction_id"))
+	if transacaoID == "" {
+		escreverErroREST(w, http.StatusBadRequest, "requisicao_invalida", "transaction_id é obrigatório")
+		return
+	}
+	resposta, err := a.estado.ConsultarTransacao(transacaoID)
+	if err != nil {
+		escreverErroREST(w, http.StatusNotFound, "transacao_nao_encontrada", err.Error())
+		return
+	}
+	escreverJSON(w, http.StatusOK, resposta)
+}
+
+func lerIdentificacaoTransacao(w http.ResponseWriter, r *http.Request) (comum.IdentificarTransacaoREST, bool) {
+	var dados comum.IdentificarTransacaoREST
+	if err := lerJSONREST(r, &dados); err != nil || strings.TrimSpace(dados.TransacaoID) == "" {
+		mensagem := "transacao_id é obrigatório"
+		if err != nil {
+			mensagem = err.Error()
+		}
+		escreverErroREST(w, http.StatusBadRequest, "requisicao_invalida", mensagem)
+		return dados, false
+	}
+	return dados, true
+}
+
+func lerJSONREST(r *http.Request, destino any) error {
+	decoder := json.NewDecoder(io.LimitReader(r.Body, limiteRespostaREST))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(destino); err != nil {
+		return fmt.Errorf("JSON inválido: %w", err)
+	}
+	return nil
 }
 
 func (a *APIREST) buscarTrechos(w http.ResponseWriter, r *http.Request) {

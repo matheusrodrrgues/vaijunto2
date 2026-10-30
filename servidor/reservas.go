@@ -12,6 +12,17 @@ import (
 // ConfirmarReserva segura o mutex até terminar a validação e o salvamento.
 // Conferir vagas sem manter essa trava deixaria dois clientes comprarem a última.
 func (e *Estado) ConfirmarReserva(token, itinerarioID string) (comum.Reserva, error) {
+	distribuida, err := e.itinerarioExigeTransacaoDistribuida(token, itinerarioID)
+	if err != nil {
+		return comum.Reserva{}, err
+	}
+	if distribuida {
+		return e.confirmarReservaDistribuida(token, itinerarioID)
+	}
+	return e.confirmarReservaLocal(token, itinerarioID)
+}
+
+func (e *Estado) confirmarReservaLocal(token, itinerarioID string) (comum.Reserva, error) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
@@ -25,11 +36,6 @@ func (e *Estado) ConfirmarReserva(token, itinerarioID string) (comum.Reserva, er
 	}
 	if pendente.Usado {
 		return comum.Reserva{}, errors.New("este itinerário já foi utilizado")
-	}
-	for _, trecho := range pendente.Itinerario.Trechos {
-		if trecho.EmpresaID != "" && trecho.EmpresaID != e.empresaID {
-			return comum.Reserva{}, errors.New("a confirmação entre empresas será implementada na etapa de reserva distribuída")
-		}
 	}
 
 	// Primeiro confere tudo. Se faltar vaga no último trecho, não faz sentido
@@ -101,6 +107,17 @@ func (e *Estado) ListarReservas(token string) ([]comum.Reserva, error) {
 }
 
 func (e *Estado) CancelarReserva(token, reservaID string) error {
+	distribuida, err := e.reservaUsaTransacaoDistribuida(token, reservaID)
+	if err != nil {
+		return err
+	}
+	if distribuida {
+		return e.cancelarReservaDistribuida(token, reservaID)
+	}
+	return e.cancelarReservaLocal(token, reservaID)
+}
+
+func (e *Estado) cancelarReservaLocal(token, reservaID string) error {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
@@ -149,6 +166,9 @@ func (e *Estado) copiarDadosSemLock() (map[string]*comum.Carona, map[string]*com
 // Quem chama precisa manter o mutex travado e decidir se a devolução é devida.
 func (e *Estado) devolverAssentosSemLock(reserva *comum.Reserva) {
 	for _, trecho := range reserva.Itinerario.Trechos {
+		if trecho.EmpresaID != "" && trecho.EmpresaID != e.empresaID {
+			continue
+		}
 		carona, existe := e.caronas[trecho.CaronaID]
 		if !existe || trecho.Indice < 0 || trecho.Indice >= len(carona.DisponiveisPorTrecho) {
 			continue
