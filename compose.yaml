@@ -1,0 +1,32 @@
+services:
+  servidor:
+    build:
+      context: .
+      dockerfile: Dockerfile.servidor
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./dados:/app/dados
+      - ./logs:/app/logs
+
+  motorista:
+    build:
+      context: .
+      dockerfile: Dockerfile.motorista
+    environment:
+      VAIJUNTO_SERVER: servidor:9000
+    stdin_open: true
+    tty: true
+    depends_on:
+      - servidor
+
+  cliente:
+    build:
+      context: .
+      dockerfile: Dockerfile.cliente
+    environment:
+      VAIJUNTO_SERVER: servidor:9000
+    stdin_open: true
+    tty: true
+    depends_on:
+      - servidor

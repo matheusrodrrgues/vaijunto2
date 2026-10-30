@@ -1,0 +1,10 @@
+apresentacao/ROTEIRO_APRESENTACAO.md
+apresentacao/TUTORIAL_FACULDADE.md
+
+# Artefatos gerados localmente
+bin/
+*.exe
+logs/*.log
+
+# Configurações locais
+.env
