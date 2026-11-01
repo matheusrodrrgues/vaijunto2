@@ -96,3 +96,16 @@ services:
       - empresa-a
       - empresa-b
       - empresa-c
+
+  preparador:
+    build:
+      context: .
+      dockerfile: Dockerfile.preparador
+    profiles:
+      - demonstracao
+    environment:
+      VAIJUNTO_PREP_EMPRESAS: empresa-a=empresa-a:9000,empresa-b=empresa-b:9000,empresa-c=empresa-c:9000
+    depends_on:
+      - empresa-a
+      - empresa-b
+      - empresa-c

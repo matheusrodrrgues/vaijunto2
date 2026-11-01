@@ -1,0 +1,12 @@
+FROM golang:1.27-alpine AS builder
+
+WORKDIR /src
+COPY go.mod ./
+COPY comum ./comum
+COPY preparador ./preparador
+RUN CGO_ENABLED=0 go build -o /out/preparador ./preparador
+
+FROM alpine:3.22
+WORKDIR /app
+COPY --from=builder /out/preparador /usr/local/bin/preparador
+ENTRYPOINT ["preparador"]
