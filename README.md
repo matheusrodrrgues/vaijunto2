@@ -99,7 +99,9 @@ vaijunto-parte-2/
 ├── motorista/               # Cliente motorista
 ├── servidor/                # Regras, rede, persistência e testes
 ├── simulador/               # Carga concorrente, métricas e injeção de falhas
+├── preparador/              # Publicação idempotente do cenário de demonstração
 ├── comum/                   # Modelos e protocolo compartilhados
+├── scripts/                 # Preparação e validação da entrega
 ├── terminal/                # Leitura e formatação dos menus
 ├── bin/                     # Executáveis do Windows
 ├── dados/
@@ -113,6 +115,7 @@ vaijunto-parte-2/
 ├── Dockerfile.motorista
 ├── Dockerfile.cliente
 ├── Dockerfile.simulador
+├── Dockerfile.preparador
 ├── compose.yaml
 ├── go.mod
 ├── iniciar.bat              # Inicia o servidor no Windows
@@ -173,6 +176,22 @@ docker compose run --rm --no-deps cliente
 ```
 
 Os clientes precisam de terminais interativos. Nesta etapa, os clientes definidos no Compose pertencem à CaronasGo e usam `empresa-a:9000`.
+
+### Preparar o cenário distribuído da apresentação
+
+O comando abaixo inicia as empresas, aguarda as APIs e publica um trecho em cada empresa. As três ofertas coexistem e seus horários são encadeados para formar `Salvador → Feira de Santana → Vitória da Conquista → Montes Claros`:
+
+```powershell
+.\scripts\preparar-demonstracao.ps1 -Data "2026-11-05"
+```
+
+O preparador reutiliza uma carona idêntica que ainda esteja totalmente disponível; assim, repetir o comando não cria duplicatas desnecessárias.
+
+Para executar automaticamente a disputa simultânea, a queda da LulaTransportes, sua recuperação e o diagnóstico final:
+
+```powershell
+.\scripts\testar-docker-completo.ps1 -Data "2026-11-05"
+```
 
 ### Comandos úteis
 

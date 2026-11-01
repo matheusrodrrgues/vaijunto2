@@ -16,7 +16,7 @@ func main() {
 	flag.StringVar(&config.senha, "senha", "1234", "senha do passageiro")
 	flag.StringVar(&config.origem, "origem", "Salvador", "cidade de origem")
 	flag.StringVar(&config.destino, "destino", "Montes Claros", "cidade de destino")
-	flag.StringVar(&config.data, "data", "2026-10-20", "data da viagem no formato AAAA-MM-DD")
+	flag.StringVar(&config.data, "data", "2026-11-05", "data da viagem no formato AAAA-MM-DD")
 	flag.IntVar(&config.requisicoes, "requisicoes", 100, "quantidade total de passageiros simulados")
 	flag.IntVar(&config.concorrencia, "concorrencia", 20, "quantidade máxima de operações simultâneas")
 	flag.DurationVar(&config.duracao, "duracao", 0, "duração do teste; quando positiva substitui requisicoes")

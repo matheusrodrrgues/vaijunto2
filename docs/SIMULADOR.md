@@ -12,7 +12,7 @@ Com as três empresas do Compose em execução:
 go run ./simulador `
   -origem "Salvador" `
   -destino "Montes Claros" `
-  -data "2026-10-20" `
+  -data "2026-11-05" `
   -requisicoes 100 `
   -concorrencia 20 `
   -espera-recuperacao 17s
@@ -32,7 +32,7 @@ Os endereços padrão são:
 docker compose --profile teste run --rm simulador `
   -origem "Salvador" `
   -destino "Montes Claros" `
-  -data "2026-10-20" `
+  -data "2026-11-05" `
   -requisicoes 100 `
   -concorrencia 20
 ~~~
@@ -49,7 +49,7 @@ go run ./simulador `
   -concorrencia 20 `
   -origem "Salvador" `
   -destino "Montes Claros" `
-  -data "2026-10-20" `
+  -data "2026-11-05" `
   -falha-servico empresa-b `
   -falha-apos 5s `
   -falha-duracao 5s `
