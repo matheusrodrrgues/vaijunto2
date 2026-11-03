@@ -11,7 +11,7 @@ import (
 
 // ExecutarServidor recebe as conexões e deixa cada cliente em seu atendimento.
 // Assim, um usuário parado no menu não segura a entrada dos demais.
-func ExecutarServidor(listener net.Listener, estado *Estado) error {
+func ExecutarServidor(listener net.Listener, estado *Estado) error { // Executa o servidor TCP, aceitando conexões e atendendo cada cliente em uma goroutine separada.
 	for {
 		conexao, err := listener.Accept()
 		if err != nil {

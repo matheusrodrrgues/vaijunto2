@@ -38,10 +38,10 @@ type ConfiguracaoServidor struct {
 // aponta para a API REST da empresa, nunca para a porta TCP dos clientes.
 type EmpresaRemota struct {
 	ID      string
-	URLBase string
+	URLBase string // URL da API REST da empresa, como http://empresa-b:8080 (não a porta TCP)
 }
 
-func carregarConfiguracaoServidor() (ConfiguracaoServidor, error) {
+func carregarConfiguracaoServidor() (ConfiguracaoServidor, error) { // Carrega a configuração do servidor a partir das variáveis de ambiente.
 	empresaID := valorAmbiente("VAIJUNTO_EMPRESA_ID", empresaPadraoID)
 	empresaNome := valorAmbiente("VAIJUNTO_EMPRESA_NOME", empresaPadraoNome)
 	enderecoTCP := valorAmbiente("VAIJUNTO_ADDR", ":9000")
@@ -55,7 +55,7 @@ func carregarConfiguracaoServidor() (ConfiguracaoServidor, error) {
 		return ConfiguracaoServidor{}, err
 	}
 
-	diretorioDados := os.Getenv("VAIJUNTO_DADOS_DIR")
+	diretorioDados := os.Getenv("VAIJUNTO_DADOS_DIR") //
 	if strings.TrimSpace(diretorioDados) == "" {
 		diretorioDados = filepath.Join("dados", empresaID)
 	}
@@ -81,7 +81,7 @@ func carregarConfiguracaoServidor() (ConfiguracaoServidor, error) {
 	return configuracao, nil
 }
 
-func (c ConfiguracaoServidor) validar() error {
+func (c ConfiguracaoServidor) validar() error { // Valida a configuração do servidor, garantindo que os campos obrigatórios estejam corretos.
 	if !empresaIDValido.MatchString(c.EmpresaID) {
 		return errors.New("VAIJUNTO_EMPRESA_ID deve usar somente letras minúsculas, números e hífens")
 	}

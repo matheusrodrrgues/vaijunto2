@@ -10,7 +10,8 @@ import (
 	"vaijunto/comum"
 )
 
-func (e *Estado) adicionarUsuario(nome, login, senha, perfil string) {
+// Estado mantém os dados do servidor, incluindo usuários, sessões e reservas.
+func (e *Estado) adicionarUsuario(nome, login, senha, perfil string) { // Adiciona um novo usuário ao estado, normalizando o login e armazenando o hash da senha.
 	login = strings.ToLower(strings.TrimSpace(login))
 	e.usuarios[login] = usuario{
 		Nome:      nome,
@@ -23,8 +24,8 @@ func (e *Estado) adicionarUsuario(nome, login, senha, perfil string) {
 // Cadastrar normaliza o usuário e verifica duplicidade com a trava ativa.
 // Dois cadastros simultâneos não podem passar com o mesmo nome de acesso.
 func (e *Estado) Cadastrar(dados comum.CadastroDados) error {
-	e.mutex.Lock()
-	defer e.mutex.Unlock()
+	e.mutex.Lock()         // Trava o acesso ao estado para evitar condições de corrida
+	defer e.mutex.Unlock() // Libera a trava ao final da função, mesmo que haja um retorno antecipado
 
 	nome := strings.TrimSpace(dados.Nome)
 	login := strings.ToLower(strings.TrimSpace(dados.Usuario))
@@ -44,7 +45,7 @@ func (e *Estado) Cadastrar(dados comum.CadastroDados) error {
 		return errors.New("este usuário já está cadastrado")
 	}
 
-	e.adicionarUsuario(nome, login, dados.Senha, dados.Perfil)
+	e.adicionarUsuario(nome, login, dados.Senha, dados.Perfil) // Adiciona o usuário ao estado, normalizando o login e armazenando o hash da senha
 	// Se não ficou salvo, não deixa uma conta que só existe até o próximo reinício.
 	if err := e.salvarUsuariosSemLock(); err != nil {
 		delete(e.usuarios, login)
@@ -55,9 +56,9 @@ func (e *Estado) Cadastrar(dados comum.CadastroDados) error {
 	return nil
 }
 
-func (e *Estado) Login(login, senha string) (comum.LoginResposta, error) {
-	e.mutex.Lock()
-	defer e.mutex.Unlock()
+func (e *Estado) Login(login, senha string) (comum.LoginResposta, error) { // Realiza o login do usuário, verificando o login e a senha, e retorna um token de sessão se bem-sucedido.
+	e.mutex.Lock()         // Trava o acesso ao estado para evitar condições de corrida
+	defer e.mutex.Unlock() // Libera a trava ao final da função, mesmo que haja um retorno antecipado
 
 	loginNormalizado := strings.ToLower(strings.TrimSpace(login))
 	u, existe := e.usuarios[loginNormalizado]
@@ -77,7 +78,7 @@ func (e *Estado) Login(login, senha string) (comum.LoginResposta, error) {
 }
 
 // Esta função só deve ser chamada quando o mutex do estado já estiver travado.
-func (e *Estado) usuarioDaSessaoSemLock(token string) (usuario, error) {
+func (e *Estado) usuarioDaSessaoSemLock(token string) (usuario, error) { // Retorna o usuário associado a um token de sessão, assumindo que o mutex do estado já está travado.
 	login, existe := e.sessoes[token]
 	if !existe || token == "" {
 		return usuario{}, errors.New("faça login antes de continuar")
@@ -86,7 +87,7 @@ func (e *Estado) usuarioDaSessaoSemLock(token string) (usuario, error) {
 }
 
 // novoToken gera uma chave aleatória para a sessão, sem colocar a senha nela.
-func novoToken() (string, error) {
+func novoToken() (string, error) { // Gera um token aleatório de 24 bytes codificado em hexadecimal para identificar a sessão do usuário.
 	bytes := make([]byte, 24)
 	if _, err := rand.Read(bytes); err != nil {
 		return "", err

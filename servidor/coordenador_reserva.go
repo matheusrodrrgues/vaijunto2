@@ -161,7 +161,8 @@ func (e *Estado) montarParticipantes(itinerario comum.Itinerario, pares []Empres
 	paresPorID := make(map[string]EmpresaRemota, len(pares))
 	for _, par := range pares {
 		paresPorID[par.ID] = par
-	}
+	} // Mapeia os IDs das empresas remotas para os próprios objetos de empresa
+	// Exemplo: empresa-a → empresa-b → empresa-c
 	ids := make([]string, 0, len(porEmpresa))
 	for id := range porEmpresa {
 		ids = append(ids, id)

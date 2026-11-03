@@ -1,5 +1,6 @@
 package comum
 
+//Define as ações TCP, como login, publicar_carona, buscar_itinerarios e confirmar_reserva. Também define o formato de Pedido, Resposta e os dados de cada operação.
 import "encoding/json"
 
 const (

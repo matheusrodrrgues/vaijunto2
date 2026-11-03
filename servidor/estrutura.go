@@ -66,12 +66,12 @@ type cancelamentoCaronaPendente struct {
 // Um mutex só resolve o ponto principal: enquanto uma reserva confere e
 // desconta as vagas, outra não pode pegar o mesmo assento no meio do caminho.
 type Estado struct {
-	mutex                  sync.Mutex
+	mutex                  sync.Mutex // protege todos os campos abaixo
 	empresaID              string
 	empresaNome            string
 	arquivoUsuarios        string
 	arquivoEstado          string
-	usuarios               map[string]usuario
+	usuarios               map[string]usuario // login -> usuário
 	sessoes                map[string]string
 	caronas                map[string]*comum.Carona
 	reservas               map[string]*comum.Reserva
@@ -80,12 +80,12 @@ type Estado struct {
 	coordenacoes           map[string]*transacaoCoordenador
 	cancelamentosPendentes map[string]*cancelamentoCaronaPendente
 	pares                  []EmpresaRemota
-	clienteREST            *ClienteRESTConsorcio
-	timeoutREST            time.Duration
-	recuperacaoIniciada    bool
-	ganchoAposCommit       func(int) error
+	clienteREST            *ClienteRESTConsorcio // cliente REST para comunicação com os pares
+	timeoutREST            time.Duration         // tempo limite para requisições REST aos pares
+	recuperacaoIniciada    bool                  // indica se a recuperação do coordenador já foi iniciada
+	ganchoAposCommit       func(int) error       // gancho chamado após commit de reserva, útil para testes
 
-	proximaCarona     int
+	proximaCarona     int // unir? ver dps
 	proximoItinerario int
 	proximaReserva    int
 }
@@ -93,10 +93,14 @@ type Estado struct {
 // ConfigurarBuscaDistribuida informa ao estado quais empresas participam da
 // busca. Cada servidor continua dono apenas dos dados de sua própria empresa.
 func (e *Estado) ConfigurarBuscaDistribuida(pares []EmpresaRemota, timeout time.Duration) {
+	// A configuração da busca distribuída pode ser chamada várias vezes, mas a recuperação do coordenador só deve ser iniciada uma vez.
+	// O mutex protege o acesso aos campos compartilhados e garante que a configuração seja consistente.
 	e.mutex.Lock()
+	// faz uma cópia do slice de pares para evitar que alterações externas afetem o estado interno.
 	e.pares = append([]EmpresaRemota(nil), pares...)
 	e.timeoutREST = timeout
 	e.clienteREST = NovoClienteRESTConsorcio(timeout)
+	// Se a recuperação do coordenador já foi iniciada, não reinicia. Isso evita que múltiplas chamadas a ConfigurarBuscaDistribuida causem problemas.
 	e.mutex.Unlock()
 	e.iniciarRecuperacaoCoordenador()
 }

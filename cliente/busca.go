@@ -17,15 +17,18 @@ func buscarItinerarios(conexao *comum.ConexaoTCP) {
 		Origem:  entrada.Texto("Cidade de origem: "),
 		Destino: entrada.Texto("Cidade de destino: "),
 	}
+	// envia a requisição de busca para o servidor e recebe a resposta
 	resposta, err := conexao.Enviar(comum.AcaoBuscarItinerarios, dados)
 	if !mostrarErro(resposta, err) {
 		return
 	}
+	// lê os itinerários da resposta do servidor
 	resultado, err := comum.LerDados[comum.ResultadoBuscaItinerarios](resposta)
 	if err != nil {
 		fmt.Println("Resposta do servidor inválida:", err)
 		return
 	}
+	// mostra os itinerários encontrados, agrupados por data, e pede para o passageiro escolher um deles
 	itinerarios := resultado.Itinerarios
 	if resultado.BuscaParcial {
 		fmt.Printf("Aviso: busca parcial; empresas indisponíveis: %v.\n", resultado.EmpresasIndisponiveis)
@@ -39,6 +42,7 @@ func buscarItinerarios(conexao *comum.ConexaoTCP) {
 	// Várias corridas podem cair no mesmo dia; o menu mostra cada data uma vez.
 	datas := make([]string, 0)
 	datasAdicionadas := make(map[string]bool)
+	// percorre os itinerários e adiciona cada data única à lista de datas
 	for _, itinerario := range itinerarios {
 		if !datasAdicionadas[itinerario.Data] {
 			datas = append(datas, itinerario.Data)
@@ -63,6 +67,7 @@ func buscarItinerarios(conexao *comum.ConexaoTCP) {
 			corridasDaData = append(corridasDaData, itinerario)
 		}
 	}
+	// mostra as corridas da data escolhida, com detalhes de cada trecho
 	itinerarios = corridasDaData
 
 	fmt.Printf("\n--- Corridas de %s ---\n", terminal.FormatarData(dataEscolhida))
@@ -84,5 +89,6 @@ func buscarItinerarios(conexao *comum.ConexaoTCP) {
 		fmt.Println("Reserva não realizada.")
 		return
 	}
+	// chama a função para confirmar a reserva do itinerário escolhido
 	confirmarReserva(conexao, itinerarios[escolha-1])
 }

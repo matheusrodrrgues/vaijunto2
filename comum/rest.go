@@ -1,5 +1,6 @@
 package comum
 
+//Define todos os JSONs utilizados na API REST entre empresas: saúde, catálogo de trechos, preparação, commit, abort e diagnóstico.
 import "time"
 
 const (

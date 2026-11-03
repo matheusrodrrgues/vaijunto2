@@ -8,7 +8,7 @@ import (
 	"net/http"
 )
 
-func main() {
+func main() { // Função principal do servidor
 	configuracao, err := carregarConfiguracaoServidor()
 	if err != nil {
 		log.Fatal("Configuração inválida: ", err)
@@ -20,7 +20,7 @@ func main() {
 	}
 	defer logAberto.Close()
 
-	estado, err := NovoEstadoEmpresaComArquivos(
+	estado, err := NovoEstadoEmpresaComArquivos( // Cria o estado da empresa a partir dos arquivos de dados
 		configuracao.EmpresaID,
 		configuracao.EmpresaNome,
 		configuracao.ArquivoUsuarios,
@@ -29,9 +29,9 @@ func main() {
 	if err != nil {
 		log.Fatal("Não foi possível carregar os dados: ", err)
 	}
-	estado.ConfigurarBuscaDistribuida(configuracao.Pares, configuracao.TimeoutREST)
+	estado.ConfigurarBuscaDistribuida(configuracao.Pares, configuracao.TimeoutREST) // Configura a busca distribuída com os pares e o tempo limite
 
-	listenerTCP, err := net.Listen("tcp", configuracao.EnderecoTCP)
+	listenerTCP, err := net.Listen("tcp", configuracao.EnderecoTCP) // Inicia o listener TCP para aceitar conexões de clientes
 	if err != nil {
 		log.Fatal("Não foi possível iniciar o servidor TCP: ", err)
 	}
@@ -42,10 +42,10 @@ func main() {
 		log.Fatal("Não foi possível iniciar a API REST: ", err)
 	}
 	defer listenerREST.Close()
-	servidorHTTP := novoServidorHTTP(configuracao, estado)
+	servidorHTTP := novoServidorHTTP(configuracao, estado) // Cria o servidor HTTP para a API REST
 
-	_, portaTCP, _ := net.SplitHostPort(listenerTCP.Addr().String())
-	_, portaREST, _ := net.SplitHostPort(listenerREST.Addr().String())
+	_, portaTCP, _ := net.SplitHostPort(listenerTCP.Addr().String())   // Obtém a porta TCP
+	_, portaREST, _ := net.SplitHostPort(listenerREST.Addr().String()) // Obtém a porta REST
 	fmt.Println()
 	fmt.Println("====================================")
 	fmt.Println("      SERVIDOR DE EMPRESA")
@@ -65,12 +65,12 @@ func main() {
 	registrar("SERVIDOR_INICIADO empresa=%s nome=%q porta_tcp=%s porta_rest=%s pares=%d",
 		configuracao.EmpresaID, configuracao.EmpresaNome, portaTCP, portaREST, len(configuracao.Pares))
 
-	erros := make(chan error, 2)
+	erros := make(chan error, 2) // canal para receber erros de goroutines
 	go func() {
 		erros <- ExecutarServidor(listenerTCP, estado)
 	}()
 	go func() {
-		err := servidorHTTP.Serve(listenerREST)
+		err := servidorHTTP.Serve(listenerREST) // Inicia o servidor HTTP para a API REST
 		if errors.Is(err, http.ErrServerClosed) {
 			err = nil
 		}

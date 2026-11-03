@@ -7,11 +7,14 @@ import (
 )
 
 func fazerLogin(conexao *comum.ConexaoTCP) {
+	// mostra o menu de login e pede usuário e senha
+	fmt.Println("\n--- Login de passageiro ---")
 	usuario := entrada.Texto("Usuário: ")
 	senha := entrada.Texto("Senha: ")
 	entrarComUsuario(conexao, usuario, senha)
 }
 
+// entrarComUsuario envia os dados de login para o servidor e, se forem válidos, guarda o token na conexão.
 func entrarComUsuario(conexao *comum.ConexaoTCP, usuario, senha string) bool {
 	resposta, err := conexao.Enviar(comum.AcaoLogin, comum.LoginDados{Usuario: usuario, Senha: senha})
 	if !mostrarErro(resposta, err) {
@@ -26,6 +29,7 @@ func entrarComUsuario(conexao *comum.ConexaoTCP, usuario, senha string) bool {
 		fmt.Println("Esta conta não é de passageiro.")
 		return false
 	}
+	// login bem-sucedido, guarda o token e o nome do usuário logado na conexão
 	conexao.Token = dados.Token
 	conexao.NomeLogado = dados.Nome
 	fmt.Println("Bem-vindo,", dados.Nome)

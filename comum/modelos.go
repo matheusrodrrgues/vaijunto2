@@ -1,5 +1,6 @@
 package comum
 
+// Define os objetos principais: Carona, TrechoItinerario, Itinerario e Reserva.
 import "time"
 
 // Carona é a viagem publicada pelo motorista. Nas listas por trecho,

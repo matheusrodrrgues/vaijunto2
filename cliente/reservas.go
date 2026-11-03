@@ -8,6 +8,7 @@ import (
 	"vaijunto/terminal"
 )
 
+// envia a requisição de reserva para o servidor e mostra a resposta.
 func confirmarReserva(conexao *comum.ConexaoTCP, itinerario comum.Itinerario) {
 	confirmacao := strings.ToLower(entrada.Texto(fmt.Sprintf(
 		"Confirmar reserva por %s? (s/n): ", terminal.FormatarDinheiro(itinerario.PrecoCentavos))))
@@ -35,10 +36,10 @@ func confirmarReserva(conexao *comum.ConexaoTCP, itinerario comum.Itinerario) {
 }
 
 func listarReservas(conexao *comum.ConexaoTCP) {
-	if !estaLogado(conexao) {
+	if !estaLogado(conexao) { //
 		return
 	}
-	reservas, ok := obterReservas(conexao)
+	reservas, ok := obterReservas(conexao) // envia a requisição de listagem de reservas para o servidor e retorna a lista de reservas do passageiro.
 	if !ok {
 		return
 	}
@@ -61,10 +62,12 @@ func cancelarReserva(conexao *comum.ConexaoTCP) {
 	if !estaLogado(conexao) {
 		return
 	}
+	// obtém todas as reservas do passageiro e filtra apenas as confirmadas
 	reservas, ok := obterReservas(conexao)
 	if !ok {
 		return
 	}
+	// filtra apenas as reservas confirmadas
 	ativas := make([]comum.Reserva, 0)
 	for _, reserva := range reservas {
 		if reserva.Status == comum.StatusReservaConfirmada {
@@ -80,6 +83,7 @@ func cancelarReserva(conexao *comum.ConexaoTCP) {
 	for i, reserva := range ativas {
 		mostrarReserva(i+1, reserva)
 	}
+	// pede para o passageiro escolher uma reserva para cancelar
 	escolha := entrada.Opcao("\nEscolha uma reserva (0 para voltar): ", len(ativas))
 	if escolha == 0 {
 		fmt.Println("Cancelamento desistido.")
@@ -91,12 +95,14 @@ func cancelarReserva(conexao *comum.ConexaoTCP) {
 		fmt.Println("Cancelamento desistido.")
 		return
 	}
+	// envia a requisição de cancelamento para o servidor e mostra a resposta
 	resposta, err := conexao.Enviar(comum.AcaoCancelarReserva, comum.IDDados{ID: selecionada.ID})
 	if mostrarErro(resposta, err) {
 		fmt.Println(resposta.Mensagem)
 	}
 }
 
+// obterReservas envia a requisição de listagem de reservas para o servidor e retorna a lista de reservas do passageiro.
 func obterReservas(conexao *comum.ConexaoTCP) ([]comum.Reserva, bool) {
 	resposta, err := conexao.Enviar(comum.AcaoListarReservas, nil)
 	if !mostrarErro(resposta, err) {

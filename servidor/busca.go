@@ -164,13 +164,13 @@ func (e *Estado) montarArestasSemLock(data string) []aresta {
 
 // ListarTrechosDisponiveisREST expõe apenas o catálogo necessário para montar
 // rotas. Usuários, sessões e reservas permanecem privados à empresa.
-func (e *Estado) ListarTrechosDisponiveisREST(data string) []comum.TrechoDisponivelREST {
+func (e *Estado) ListarTrechosDisponiveisREST(data string) []comum.TrechoDisponivelREST { // Retorna a lista de trechos disponíveis para reserva, filtrando por data se fornecida, e convertendo para o formato REST.
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 	arestas := e.montarArestasSemLock(data)
 	lista := make([]comum.TrechoDisponivelREST, 0, len(arestas))
 	for _, a := range arestas {
-		lista = append(lista, comum.TrechoDisponivelREST{
+		lista = append(lista, comum.TrechoDisponivelREST{ // Converte cada aresta para o formato REST, preservando os campos relevantes.
 			EmpresaID: a.empresaID, CaronaID: a.caronaID, Indice: a.indice, Data: a.data,
 			Origem: a.origem, Destino: a.destino, Saida: a.saida, Chegada: a.chegada,
 			PrecoCentavos: a.precoCentavos, Vagas: a.vagas,
@@ -218,7 +218,8 @@ func (e *Estado) buscarCaminhos(arestas []aresta, cidade, destino string, horari
 
 func identidadeCarona(a aresta) string { return a.empresaID + "|" + a.caronaID }
 
-func transformarItinerario(caminho []aresta) comum.Itinerario {
+// copiarArestas cria uma cópia de um slice de arestas, garantindo que alterações subsequentes não afetem o original.
+func transformarItinerario(caminho []aresta) comum.Itinerario { // Converte um caminho de arestas em um itinerário, somando preços e determinando o número mínimo de vagas disponíveis.
 	itinerario := comum.Itinerario{Vagas: caminho[0].vagas, Trechos: make([]comum.TrechoItinerario, 0, len(caminho))}
 	caronasUsadas := make(map[string]bool)
 	for _, a := range caminho {

@@ -25,10 +25,12 @@ type estadoArquivo struct {
 	CancelamentosPendentes []cancelamentoCaronaPendente `json:"cancelamentos_pendentes,omitempty"`
 }
 
+// NovoEstadoComArquivos cria um estado de servidor com os arquivos de usuários e estado especificados, carregando os dados existentes se disponíveis.
 func NovoEstadoComArquivos(arquivoUsuarios, arquivoEstado string) (*Estado, error) {
 	return NovoEstadoEmpresaComArquivos(empresaPadraoID, empresaPadraoNome, arquivoUsuarios, arquivoEstado)
 }
 
+// NovoEstadoEmpresaComArquivos cria um estado de servidor para uma empresa específica, carregando os arquivos de usuários e estado fornecidos.
 func NovoEstadoEmpresaComArquivos(empresaID, empresaNome, arquivoUsuarios, arquivoEstado string) (*Estado, error) {
 	estado, err := novoEstadoEmpresaComArquivo(empresaID, empresaNome, arquivoUsuarios)
 	if err != nil {
@@ -44,6 +46,7 @@ func NovoEstadoEmpresaComArquivos(empresaID, empresaNome, arquivoUsuarios, arqui
 	return estado, nil
 }
 
+// novoEstadoEmpresaComArquivo cria um estado de servidor para uma empresa específica, carregando o arquivo de usuários fornecido.
 func (e *Estado) carregarEstado() error {
 	if e.arquivoEstado == "" {
 		return nil
@@ -77,7 +80,7 @@ func (e *Estado) carregarEstado() error {
 		}
 		e.caronas[carona.ID] = &carona
 	}
-	e.reservas = make(map[string]*comum.Reserva)
+	e.reservas = make(map[string]*comum.Reserva) // Prepara o mapa de reservas para armazenar as reservas carregadas do arquivo de estado.
 	for i := range salvo.Reservas {
 		reserva := salvo.Reservas[i]
 		e.reservas[reserva.ID] = &reserva
@@ -108,7 +111,7 @@ func (e *Estado) salvarEstadoSemLock() error {
 	if e.arquivoEstado == "" {
 		return nil
 	}
-
+	// Cria uma estrutura de estadoArquivo para salvar o estado atual do servidor, incluindo caronas, reservas, transações e coordenacoes.
 	salvo := estadoArquivo{
 		EmpresaID:     e.empresaID,
 		ProximaCarona: e.proximaCarona, ProximaReserva: e.proximaReserva,
