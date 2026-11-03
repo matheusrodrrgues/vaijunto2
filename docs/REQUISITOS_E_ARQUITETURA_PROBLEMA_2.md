@@ -128,18 +128,19 @@ A ordenação elimina espera circular. O custo é reduzir o paralelismo durante 
 
 O comportamento será validado sob o modelo de falha por parada e recuperação usado no laboratório. Partições prolongadas exigem explicitar o compromisso entre disponibilidade e consistência no relatório.
 
-## 4. API REST inicial proposta
+## 4. API REST implementada
 
 | Método | Recurso | Finalidade |
 |---|---|---|
 | `GET` | `/api/v1/health` | Verificar disponibilidade da empresa |
 | `GET` | `/api/v1/rides/search` | Consultar trechos locais disponíveis |
-| `POST` | `/api/v1/transactions/{id}/prepare` | Solicitar bloqueio durável dos trechos locais |
-| `PUT` | `/api/v1/transactions/{id}/commit` | Aplicar decisão de confirmação |
-| `PUT` | `/api/v1/transactions/{id}/abort` | Liberar bloqueios da transação |
-| `GET` | `/api/v1/transactions/{id}` | Consultar decisão e estado para recuperação |
+| `POST` | `/api/v1/reservations/prepare` | Solicitar bloqueio durável dos trechos locais |
+| `POST` | `/api/v1/reservations/commit` | Aplicar decisão de confirmação |
+| `POST` | `/api/v1/reservations/abort` | Liberar bloqueios da transação |
+| `POST` | `/api/v1/reservations/invalidate` | Propagar o cancelamento de uma carona pelo motorista |
+| `GET` | `/api/v1/reservations/status` | Consultar decisão e estado para recuperação |
 
-Todos os endpoints transacionais devem aceitar repetição da mesma operação sem duplicar reservas ou liberar assentos incorretamente.
+Todos os endpoints transacionais mutáveis exigem `Idempotency-Key` igual ao `transacao_id` e aceitam repetição da mesma operação sem duplicar reservas ou liberar assentos incorretamente.
 
 ## 5. Matriz do barema
 

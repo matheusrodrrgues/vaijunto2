@@ -340,7 +340,7 @@ Os nomes das cidades são comparados ignorando maiúsculas/minúsculas e espaço
 | `logs/<empresa_id>/servidor.log` | Eventos exclusivos da instância | Sim |
 | Apenas em memória | Sessões, tokens e resultados temporários de busca `ITI` | Não |
 
-Caronas, reservas e estados das transações participantes são gravados juntos em `estado.json`, dentro do controle de concorrência do servidor. O código escreve um arquivo temporário antes de substituir o arquivo de estado. Preparações sobrevivem à reinicialização e possuem prazo para não manter assentos bloqueados indefinidamente.
+Caronas, reservas, estados das transações e invalidações de caronas ainda não entregues ao coordenador são gravados juntos em `estado.json`, dentro do controle de concorrência do servidor. O código escreve um arquivo temporário antes de substituir o arquivo de estado. Preparações sobrevivem à reinicialização e possuem prazo para não manter assentos bloqueados indefinidamente.
 
 O mecanismo atual remove o arquivo anterior antes da renomeação; portanto, ainda existe uma janela de perda em caso de interrupção nesse intervalo. Ele não oferece garantia de recuperação contra queda de energia. Para preservar uma demonstração, faça uma cópia da pasta `dados/` com o servidor parado. Não edite os JSON enquanto o servidor estiver rodando.
 
@@ -638,6 +638,8 @@ go test -v ./...
 | Reserva e cancelamento | Desconta e devolve vagas |
 | Itinerário com trecho lotado | Não confirma uma viagem pela metade |
 | Cancelamento de carona | Cancela a reserva completa e devolve as vagas envolvidas |
+| Cancelamento distribuído do motorista | Invalida a reserva no coordenador, aborta todos os participantes e retoma após indisponibilidade |
+| Idempotência REST | Exige chave igual à transação e repete operações sem novo desconto |
 | 30 clientes TCP concorrentes | Somente um consegue reservar o último assento |
 | Persistência | Recupera caronas, reservas, vagas, cancelamentos e contador de caronas após reiniciar |
 | Recuperação do coordenador | Retoma um `commit` interrompido entre duas empresas |

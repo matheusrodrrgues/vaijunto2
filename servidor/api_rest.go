@@ -33,6 +33,7 @@ func NovaAPIREST(configuracao ConfiguracaoServidor, estado *Estado) http.Handler
 	mux.HandleFunc("/api/v1/reservations/prepare", api.prepararReserva)
 	mux.HandleFunc("/api/v1/reservations/commit", api.confirmarReserva)
 	mux.HandleFunc("/api/v1/reservations/abort", api.abortarReserva)
+	mux.HandleFunc("/api/v1/reservations/invalidate", api.invalidarReserva)
 	mux.HandleFunc("/api/v1/reservations/status", api.consultarReserva)
 	mux.HandleFunc("/api/v1/diagnostics/transactions", api.resumoTransacoes)
 	mux.HandleFunc("/", recursoRESTNaoEncontrado)
@@ -55,6 +56,9 @@ func (a *APIREST) prepararReserva(w http.ResponseWriter, r *http.Request) {
 		escreverErroREST(w, http.StatusBadRequest, "requisicao_invalida", err.Error())
 		return
 	}
+	if !validarChaveIdempotencia(w, r, dados.TransacaoID) {
+		return
+	}
 	resposta, err := a.estado.PrepararTransacao(dados)
 	if err != nil {
 		escreverErroREST(w, http.StatusConflict, "preparacao_recusada", err.Error())
@@ -69,6 +73,9 @@ func (a *APIREST) confirmarReserva(w http.ResponseWriter, r *http.Request) {
 	}
 	dados, ok := lerIdentificacaoTransacao(w, r)
 	if !ok {
+		return
+	}
+	if !validarChaveIdempotencia(w, r, dados.TransacaoID) {
 		return
 	}
 	resposta, err := a.estado.ConfirmarTransacao(dados.TransacaoID)
@@ -87,9 +94,32 @@ func (a *APIREST) abortarReserva(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if !validarChaveIdempotencia(w, r, dados.TransacaoID) {
+		return
+	}
 	resposta, err := a.estado.AbortarTransacao(dados.TransacaoID)
 	if err != nil {
 		escreverErroREST(w, http.StatusConflict, "cancelamento_recusado", err.Error())
+		return
+	}
+	escreverJSON(w, http.StatusOK, resposta)
+}
+
+func (a *APIREST) invalidarReserva(w http.ResponseWriter, r *http.Request) {
+	if !permitirMetodo(w, r, http.MethodPost) {
+		return
+	}
+	var dados comum.InvalidarReservaREST
+	if err := lerJSONREST(r, &dados); err != nil {
+		escreverErroREST(w, http.StatusBadRequest, "requisicao_invalida", err.Error())
+		return
+	}
+	if !validarChaveIdempotencia(w, r, dados.TransacaoID) {
+		return
+	}
+	resposta, err := a.estado.InvalidarReservaDistribuida(dados)
+	if err != nil {
+		escreverErroREST(w, http.StatusConflict, "invalidacao_recusada", err.Error())
 		return
 	}
 	escreverJSON(w, http.StatusOK, resposta)
@@ -123,6 +153,19 @@ func lerIdentificacaoTransacao(w http.ResponseWriter, r *http.Request) (comum.Id
 		return dados, false
 	}
 	return dados, true
+}
+
+func validarChaveIdempotencia(w http.ResponseWriter, r *http.Request, transacaoID string) bool {
+	chave := strings.TrimSpace(r.Header.Get(comum.CabecalhoIdempotencia))
+	if chave == "" {
+		escreverErroREST(w, http.StatusBadRequest, "idempotencia_obrigatoria", "Idempotency-Key é obrigatório")
+		return false
+	}
+	if chave != strings.TrimSpace(transacaoID) {
+		escreverErroREST(w, http.StatusConflict, "idempotencia_invalida", "Idempotency-Key deve ser igual ao transacao_id")
+		return false
+	}
+	return true
 }
 
 func lerJSONREST(r *http.Request, destino any) error {

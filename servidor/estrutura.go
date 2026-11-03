@@ -53,27 +53,37 @@ type transacaoCoordenador struct {
 	EmProcessamento bool                      `json:"-"`
 }
 
+type cancelamentoCaronaPendente struct {
+	TransacaoID     string    `json:"transacao_id"`
+	CoordenadorID   string    `json:"coordenador_id"`
+	CaronaID        string    `json:"carona_id"`
+	UltimoErro      string    `json:"ultimo_erro,omitempty"`
+	AtualizadaEm    time.Time `json:"atualizada_em"`
+	EmProcessamento bool      `json:"-"`
+}
+
 // Estado concentra os dados compartilhados entre os clientes.
 // Um mutex só resolve o ponto principal: enquanto uma reserva confere e
 // desconta as vagas, outra não pode pegar o mesmo assento no meio do caminho.
 type Estado struct {
-	mutex               sync.Mutex
-	empresaID           string
-	empresaNome         string
-	arquivoUsuarios     string
-	arquivoEstado       string
-	usuarios            map[string]usuario
-	sessoes             map[string]string
-	caronas             map[string]*comum.Carona
-	reservas            map[string]*comum.Reserva
-	itinerarios         map[string]*itinerarioPendente
-	transacoes          map[string]*transacaoParticipante
-	coordenacoes        map[string]*transacaoCoordenador
-	pares               []EmpresaRemota
-	clienteREST         *ClienteRESTConsorcio
-	timeoutREST         time.Duration
-	recuperacaoIniciada bool
-	ganchoAposCommit    func(int) error
+	mutex                  sync.Mutex
+	empresaID              string
+	empresaNome            string
+	arquivoUsuarios        string
+	arquivoEstado          string
+	usuarios               map[string]usuario
+	sessoes                map[string]string
+	caronas                map[string]*comum.Carona
+	reservas               map[string]*comum.Reserva
+	itinerarios            map[string]*itinerarioPendente
+	transacoes             map[string]*transacaoParticipante
+	coordenacoes           map[string]*transacaoCoordenador
+	cancelamentosPendentes map[string]*cancelamentoCaronaPendente
+	pares                  []EmpresaRemota
+	clienteREST            *ClienteRESTConsorcio
+	timeoutREST            time.Duration
+	recuperacaoIniciada    bool
+	ganchoAposCommit       func(int) error
 
 	proximaCarona     int
 	proximoItinerario int
@@ -101,16 +111,17 @@ func NovoEstado() *Estado {
 // nunca recebe mapas ou arquivos compartilhados com outra instância.
 func NovoEstadoEmpresa(empresaID, empresaNome string) *Estado {
 	estado := &Estado{
-		empresaID:    empresaID,
-		empresaNome:  empresaNome,
-		usuarios:     make(map[string]usuario),
-		sessoes:      make(map[string]string),
-		caronas:      make(map[string]*comum.Carona),
-		reservas:     make(map[string]*comum.Reserva),
-		itinerarios:  make(map[string]*itinerarioPendente),
-		transacoes:   make(map[string]*transacaoParticipante),
-		coordenacoes: make(map[string]*transacaoCoordenador),
-		timeoutREST:  2 * time.Second,
+		empresaID:              empresaID,
+		empresaNome:            empresaNome,
+		usuarios:               make(map[string]usuario),
+		sessoes:                make(map[string]string),
+		caronas:                make(map[string]*comum.Carona),
+		reservas:               make(map[string]*comum.Reserva),
+		itinerarios:            make(map[string]*itinerarioPendente),
+		transacoes:             make(map[string]*transacaoParticipante),
+		coordenacoes:           make(map[string]*transacaoCoordenador),
+		cancelamentosPendentes: make(map[string]*cancelamentoCaronaPendente),
+		timeoutREST:            2 * time.Second,
 	}
 	estado.clienteREST = NovoClienteRESTConsorcio(estado.timeoutREST)
 

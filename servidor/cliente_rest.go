@@ -159,6 +159,17 @@ func (c *ClienteRESTConsorcio) AbortarReserva(ctx context.Context, par EmpresaRe
 	return nil
 }
 
+func (c *ClienteRESTConsorcio) InvalidarReserva(ctx context.Context, par EmpresaRemota, dados comum.InvalidarReservaREST) error {
+	resposta, err := c.enviarTransacao(ctx, par, "/api/v1/reservations/invalidate", dados, dados.TransacaoID)
+	if err != nil {
+		return err
+	}
+	if resposta.Status != comum.StatusTransacaoAbortada {
+		return errors.New("estado inesperado na invalidação")
+	}
+	return nil
+}
+
 func (c *ClienteRESTConsorcio) ConsultarReserva(ctx context.Context, par EmpresaRemota, transacaoID string) (comum.RespostaTransacaoREST, error) {
 	endpoint, err := url.Parse(par.URLBase + "/api/v1/reservations/status")
 	if err != nil {

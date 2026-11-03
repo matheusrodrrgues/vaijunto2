@@ -77,6 +77,14 @@ type IdentificarTransacaoREST struct {
 	TransacaoID string `json:"transacao_id"`
 }
 
+// InvalidarReservaREST informa ao coordenador que uma carona participante foi
+// cancelada pelo motorista e que a reserva completa precisa ser desfeita.
+type InvalidarReservaREST struct {
+	TransacaoID     string `json:"transacao_id"`
+	EmpresaOrigemID string `json:"empresa_origem_id"`
+	CaronaID        string `json:"carona_id"`
+}
+
 type RespostaTransacaoREST struct {
 	EmpresaID   string `json:"empresa_id"`
 	TransacaoID string `json:"transacao_id"`

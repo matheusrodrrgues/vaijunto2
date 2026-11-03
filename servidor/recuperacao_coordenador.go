@@ -184,6 +184,11 @@ func (e *Estado) concluirAbortoCoordenacao(transacaoID string) error {
 	registro.Status = statusCoordenacaoAbortada
 	registro.EmProcessamento = false
 	registro.AtualizadaEm = time.Now()
+	if registro.Reserva.Status == comum.StatusCanceladaMotorista {
+		if reserva, existe := e.reservas[registro.Reserva.ID]; existe {
+			reserva.Status = comum.StatusCanceladaMotorista
+		}
+	}
 	if pendente, ok := e.itinerarios[registro.ItinerarioID]; ok {
 		pendente.EmProcessamento = false
 	}
@@ -215,10 +220,12 @@ func (e *Estado) iniciarRecuperacaoCoordenador() {
 
 	go func() {
 		e.recuperarCoordenacoesPendentes()
+		e.recuperarCancelamentosCaronaPendentes()
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
 		for range ticker.C {
 			e.recuperarCoordenacoesPendentes()
+			e.recuperarCancelamentosCaronaPendentes()
 		}
 	}()
 }

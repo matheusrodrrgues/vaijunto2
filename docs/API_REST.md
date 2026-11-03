@@ -10,7 +10,7 @@ A API REST é usada somente na comunicação entre empresas do consórcio. Os cl
 - Toda resposta contém o cabeçalho `X-Request-ID`.
 - Se o emissor enviar `X-Request-ID`, o servidor devolve o mesmo valor.
 - Se o cabeçalho estiver ausente, o servidor gera um identificador.
-- Operações mutáveis futuras usarão também `Idempotency-Key` para permitir repetição segura.
+- `prepare`, `commit`, `abort` e `invalidate` exigem `Idempotency-Key` igual ao `transacao_id` do corpo. Chave ausente retorna `400`; chave divergente retorna `409`.
 - Cada chamada entre empresas possui timeout configurável.
 
 ## Formato de erro
@@ -165,6 +165,20 @@ Libera os assentos da transação. Também é idempotente e pode compensar uma c
 {"transacao_id":"tx-empresa-a-req-123"}
 ~~~
 
+### `POST /api/v1/reservations/invalidate`
+
+Usado pelo servidor proprietário quando o motorista cancela uma carona que participa de uma reserva distribuída. O coordenador persiste a decisão de cancelamento, marca a reserva como `cancelada pelo motorista` e aborta todos os participantes.
+
+~~~json
+{
+  "transacao_id": "tx-empresa-a-req-123",
+  "empresa_origem_id": "empresa-b",
+  "carona_id": "CAR-001"
+}
+~~~
+
+A operação valida se a carona realmente pertence ao itinerário. Se o coordenador estiver indisponível, o proprietário mantém a invalidação em `estado.json` e tenta novamente após a recuperação.
+
 ### `GET /api/v1/reservations/status?transaction_id=...`
 
 Consulta o estado local da transação: `preparada`, `confirmada` ou `abortada`.
@@ -192,7 +206,7 @@ Ao final da carga, `preparadas` e `coordenacoes_pendentes` devem ser iguais a ze
 | Código | Significado |
 | --- | --- |
 | `200 OK` | Requisição concluída |
-| `400 Bad Request` | Data em formato inválido |
+| `400 Bad Request` | Dados inválidos ou `Idempotency-Key` ausente |
 | `409 Conflict` | Preparação ou transição recusada |
 | `404 Not Found` | Recurso inexistente |
 | `405 Method Not Allowed` | Método não aceito pelo recurso |
@@ -215,6 +229,7 @@ O ID local não pode aparecer na lista de pares. IDs repetidos e URLs sem `http`
 - Os demais pares e as operações locais continuam funcionando.
 - Na busca, os pares são consultados em paralelo. Os trechos válidos das empresas disponíveis ainda formam itinerários e o cliente recebe a indicação de busca parcial e os IDs dos pares indisponíveis.
 - Uma decisão pendente do coordenador é retomada após reinicialização. Falhas temporárias permanecem registradas e são tentadas novamente a cada segundo.
+- Invalidações causadas pelo cancelamento de uma carona também são persistidas e repetidas até o coordenador cancelar a reserva completa.
 - Se todos os participantes ainda estiverem preparados ou confirmados, a recuperação conclui o `commit`.
 - Se algum participante já tiver abortado por expiração, a recuperação compensa os demais e termina sem reserva parcial.
 

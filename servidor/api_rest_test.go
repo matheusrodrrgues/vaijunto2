@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,47 @@ import (
 
 	"vaijunto/comum"
 )
+
+func TestAPITransacionalExigeChaveDeIdempotenciaCorrespondente(t *testing.T) {
+	estado := NovoEstadoEmpresa("empresa-a", "CaronasGo")
+	publicarTrechoTeste(t, estado, "Salvador", "Feira de Santana", "08:00", 60, 2500)
+	api := NovaAPIREST(configuracaoRESTTeste("empresa-a", "CaronasGo", nil, time.Second), estado)
+	dados := comum.PrepararReservaREST{
+		TransacaoID: "tx-chave", CoordenadorID: "empresa-b", DuracaoBloqueioMS: 5000,
+		Trechos: []comum.TrechoTransacaoREST{{CaronaID: "CAR-001", Indice: 0}},
+	}
+	corpo, err := json.Marshal(dados)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	semChave := httptest.NewRecorder()
+	api.ServeHTTP(semChave, httptest.NewRequest(http.MethodPost, "/api/v1/reservations/prepare", bytes.NewReader(corpo)))
+	if semChave.Code != http.StatusBadRequest {
+		t.Fatalf("requisição sem chave retornou %d", semChave.Code)
+	}
+
+	chaveDiferente := httptest.NewRequest(http.MethodPost, "/api/v1/reservations/prepare", bytes.NewReader(corpo))
+	chaveDiferente.Header.Set(comum.CabecalhoIdempotencia, "tx-outra")
+	respostaDiferente := httptest.NewRecorder()
+	api.ServeHTTP(respostaDiferente, chaveDiferente)
+	if respostaDiferente.Code != http.StatusConflict {
+		t.Fatalf("chave divergente retornou %d", respostaDiferente.Code)
+	}
+
+	for tentativa := 0; tentativa < 2; tentativa++ {
+		requisicao := httptest.NewRequest(http.MethodPost, "/api/v1/reservations/prepare", bytes.NewReader(corpo))
+		requisicao.Header.Set(comum.CabecalhoIdempotencia, dados.TransacaoID)
+		resposta := httptest.NewRecorder()
+		api.ServeHTTP(resposta, requisicao)
+		if resposta.Code != http.StatusOK {
+			t.Fatalf("tentativa idempotente %d retornou %d: %s", tentativa+1, resposta.Code, resposta.Body.String())
+		}
+	}
+	if vagas := vagasTrechoTeste(estado, "CAR-001", 0); vagas != 0 {
+		t.Fatalf("repetição da preparação alterou as vagas incorretamente: %d", vagas)
+	}
+}
 
 func TestAPIRestInformaSaudeEPropagaRequestID(t *testing.T) {
 	api := NovaAPIREST(configuracaoRESTTeste("empresa-a", "Empresa A", nil, 200*time.Millisecond), NovoEstadoEmpresa("empresa-a", "Empresa A"))

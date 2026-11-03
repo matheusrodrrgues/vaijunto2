@@ -128,41 +128,87 @@ func (e *Estado) ListarCaronas(token string) ([]comum.Carona, error) {
 
 func (e *Estado) CancelarCarona(token, caronaID string) error {
 	e.mutex.Lock()
-	defer e.mutex.Unlock()
 
 	u, err := e.usuarioDaSessaoSemLock(token)
 	if err != nil {
+		e.mutex.Unlock()
 		return err
 	}
 	carona, existe := e.caronas[caronaID]
 	if !existe {
+		e.mutex.Unlock()
 		return errors.New("carona não encontrada")
 	}
 	if carona.Motorista != u.Login {
+		e.mutex.Unlock()
 		return errors.New("a carona pertence a outro motorista")
 	}
 	if carona.Cancelada {
+		e.mutex.Unlock()
 		return errors.New("a carona já está cancelada")
 	}
 
 	// Se uma parte da viagem caiu, a reserva completa perde o sentido.
 	// Guarda uma cópia para desfazer o cancelamento se não conseguir salvar.
 	caronasAntes, reservasAntes := e.copiarDadosSemLock()
+	cancelamentosAntes := copiarCancelamentosPendentes(e.cancelamentosPendentes)
 	carona.Cancelada = true
 	for _, reserva := range e.reservas {
-		if reserva.Status != comum.StatusReservaConfirmada || !usaCarona(reserva, e.empresaID, caronaID) {
+		if reserva.TransacaoID != "" || reserva.Status != comum.StatusReservaConfirmada || !usaCarona(reserva, e.empresaID, caronaID) {
 			continue
 		}
 		e.devolverAssentosSemLock(reserva)
 		reserva.Status = comum.StatusCanceladaMotorista
 	}
+	transacoesAfetadas := make([]string, 0)
+	for id, transacao := range e.transacoes {
+		if transacao.Status == comum.StatusTransacaoAbortada || !transacaoUsaCarona(transacao, caronaID) {
+			continue
+		}
+		e.cancelamentosPendentes[id] = &cancelamentoCaronaPendente{
+			TransacaoID: id, CoordenadorID: transacao.CoordenadorID, CaronaID: caronaID,
+			AtualizadaEm: time.Now(),
+		}
+		transacoesAfetadas = append(transacoesAfetadas, id)
+	}
 	if err := e.salvarEstadoSemLock(); err != nil {
 		e.caronas = caronasAntes
 		e.reservas = reservasAntes
+		e.cancelamentosPendentes = cancelamentosAntes
+		e.mutex.Unlock()
 		return errors.New("não foi possível salvar o cancelamento")
 	}
+	e.mutex.Unlock()
+
+	errosPendentes := 0
+	for _, transacaoID := range transacoesAfetadas {
+		if err := e.processarCancelamentoCaronaPendente(transacaoID); err != nil {
+			errosPendentes++
+		}
+	}
 	registrar("CARONA_CANCELADA usuario=%s carona=%s", u.Login, caronaID)
+	if errosPendentes > 0 {
+		return fmt.Errorf("carona cancelada; %d reserva(s) distribuída(s) aguardam recuperação", errosPendentes)
+	}
 	return nil
+}
+
+func copiarCancelamentosPendentes(origem map[string]*cancelamentoCaronaPendente) map[string]*cancelamentoCaronaPendente {
+	copia := make(map[string]*cancelamentoCaronaPendente, len(origem))
+	for id, pendente := range origem {
+		valor := *pendente
+		copia[id] = &valor
+	}
+	return copia
+}
+
+func transacaoUsaCarona(transacao *transacaoParticipante, caronaID string) bool {
+	for _, trecho := range transacao.Trechos {
+		if trecho.CaronaID == caronaID {
+			return true
+		}
+	}
+	return false
 }
 
 // ListarPassageiros retorna reservas confirmadas que passam por esta carona.
