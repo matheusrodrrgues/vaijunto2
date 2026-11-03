@@ -167,6 +167,7 @@ Documentação técnica:
 
 - [API REST entre empresas](docs/API_REST.md)
 - [Simulador de carga e falhas](docs/SIMULADOR.md)
+- [Roteiro de testes e demonstração em três máquinas](docs/roteiro_inicializacao.md)
 - [Execução com Docker e rede](DOCKER.md)
 
 ## Requisitos
