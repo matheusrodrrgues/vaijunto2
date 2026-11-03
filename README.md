@@ -35,6 +35,77 @@ Cada instância possui:
 
 Não existe coordenador fixo. Em cada reserva, o servidor da empresa do passageiro assume temporariamente a coordenação.
 
+## Problema 1 x Problema 2
+
+No Problema 1, usuários, caronas e reservas ficavam em um único servidor. A segunda etapa distribui esses dados entre empresas independentes e permite montar uma viagem com trechos de todas elas.
+
+### Mudança de arquitetura
+
+```mermaid
+flowchart LR
+    subgraph P1["Problema 1 - arquitetura centralizada"]
+        M1[Motorista] -->|TCP| S1[Servidor VaiJunto]
+        P1C[Passageiro] -->|TCP| S1
+        S1 --> D1[(Usuários, caronas e reservas)]
+    end
+
+    subgraph P2["Problema 2 - arquitetura distribuída"]
+        M2[Motorista] -->|TCP| A[CaronasGo]
+        P2C[Passageiro] -->|TCP| A
+        A <-->|REST| B[LulaTransportes]
+        A <-->|REST| C[TetraCaronas]
+        B <-->|REST| C
+        A --> DA[(Dados A)]
+        B --> DB[(Dados B)]
+        C --> DC[(Dados C)]
+    end
+```
+
+| Aspecto | Problema 1 | Problema 2 |
+|---|---|---|
+| Organização | Um servidor central | Três servidores independentes |
+| Dados | Um estado compartilhado por todos | Cada empresa mantém apenas seus dados |
+| Cliente | Conecta ao servidor central | Conecta somente à própria empresa |
+| Comunicação | TCP entre cliente e servidor | TCP com clientes e REST entre empresas |
+| Busca | Consulta somente a memória local | Combina catálogos recebidos dos pares |
+| Reserva | Operação local protegida por mutex | Transação distribuída em duas fases |
+| Coordenador | O próprio servidor central | Servidor do passageiro, escolhido por reserva |
+| Precedência | Ordem processada pelo mutex central | Ordem processada pelo proprietário do assento |
+| Falha | Pode interromper toda a plataforma | Afeta apenas operações dependentes da empresa caída |
+| Recuperação | Recarrega um único estado | Reconcilia decisões persistidas entre participantes |
+
+### Mudança no fluxo da reserva
+
+```mermaid
+flowchart TB
+    subgraph R1["Problema 1 - confirmação local"]
+        C1[Passageiro confirma] --> S1[Servidor verifica todos os trechos]
+        S1 --> L1[Mutex protege as vagas]
+        L1 --> V1{Todos disponíveis?}
+        V1 -->|Sim| OK1[Cria a reserva]
+        V1 -->|Não| F1[Recusa sem alterar vagas]
+    end
+
+    subgraph R2["Problema 2 - confirmação distribuída"]
+        C2[Passageiro confirma] --> CO[Servidor da empresa coordena]
+        CO --> PR[Prepare em cada empresa]
+        PR --> V2{Todas prepararam?}
+        V2 -->|Sim| DC2[Persiste decisão de commit]
+        DC2 --> CM[Confirma todos os participantes]
+        V2 -->|Não| AB[Aborta as preparações]
+    end
+```
+
+| Situação | Problema 1 | Problema 2 |
+|---|---|---|
+| Dois passageiros disputam a última vaga | O mutex central escolhe um vencedor | O servidor dono da carona escolhe um vencedor |
+| Um trecho fica indisponível | A operação local é desfeita | O coordenador envia abort aos participantes |
+| Servidor cai durante a reserva | A plataforma inteira fica indisponível | As empresas independentes continuam funcionando |
+| Resposta se perde | O cliente pode consultar o servidor central | O coordenador consulta o estado da transação e repete com idempotência |
+| Motorista cancela uma carona | O servidor altera a reserva local | O cancelamento é propagado e retomado após falhas |
+
+O ganho da nova arquitetura é a independência entre as empresas. O custo é a necessidade de timeouts, idempotência, persistência das decisões e recuperação de transações incompletas.
+
 ## Funcionalidades
 
 ### Motorista
